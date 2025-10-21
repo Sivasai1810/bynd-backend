@@ -6,8 +6,8 @@ import cookieParser from "cookie-parser";
 import userurl from "./profilefetching/userdatafetching.js";
 import previewurls from "./previewsection/preview.js";
 import designdetails from "./designdetials/user_design_details.js";
-import signup from "./auth/signup.js";
-import login from "./auth/login.js";
+import signup from "./authentication/signup.js";
+import login from "./authentication/login.js";
 import redirecturl from "./supabase/redirecturl.js";
 import fetching from "./fetch/profile.js";
 
