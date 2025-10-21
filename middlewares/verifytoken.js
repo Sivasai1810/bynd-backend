@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 import jsonwebtoken from "jsonwebtoken"
 dotenv.config()
 const jsonpassword = process.env.JSONWEBPASSWORD
+const isproduction=process.env.ISPRODUCTION==='true'
 const verifyToken = async (req, res, next) => {
   try {
     const RefreshToken = req.cookies.rf_token; 
@@ -35,10 +36,10 @@ const verifyToken = async (req, res, next) => {
 
         // set new cookie
         res.cookie("ac_token", newAccessToken, {
-          httpOnly: true,
-          secure: false,
-          sameSite: "lax",
-          maxAge: 1000 * 60 * 60 * 24 * 2,
+             httpOnly:true,
+    secure:isproduction?true:false,
+    maxAge:1000*60*60*24*2,
+    sameSite:isproduction?'none':'lax',
         });
 
         req.user = decoded.id;

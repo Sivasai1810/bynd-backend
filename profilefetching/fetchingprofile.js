@@ -4,7 +4,7 @@ import verifyToken from "../middlewares/verifytoken.js";
 
 const router = express.Router();
 router.use(express.json());
-router.post('', verifyToken, async (req, res) => {
+router.get('', verifyToken, async (req, res) => {
 
   try {
     const user_id = req.user;

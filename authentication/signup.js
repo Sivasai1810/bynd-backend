@@ -1,10 +1,12 @@
 import dotenv from "dotenv"
+dotenv.config()
 import express from "express"
 import bcrypt from 'bcrypt'
 import { supabase_connect } from "../supabase/set-up.js"
 import jsonwebtoken from 'jsonwebtoken';
 const router=express.Router();
   const jsonpassword=process.env.JSONWEBPASSWORD
+  const isproduction=process.env.ISPRODUCTION==='true'
 router.post('',async(req,res)=>{
 const {user_name,user_email,user_password}=req.body;
 const {data:existingUsers}=await supabase_connect
@@ -34,16 +36,16 @@ if(existingUser){
 const AccessToken=jsonwebtoken.sign(playload,jsonpassword,{expiresIn:'2d'})
 const RefreshToken =jsonwebtoken.sign(playload,jsonpassword,{expiresIn:'7d'})
 res.cookie('ac_token',AccessToken,{
-    httpOnly:false,
-    secure:false,
+     httpOnly:true,
+    secure:isproduction?true:false,
     maxAge:1000*60*60*24*2,
-    sameSite:'lax',
+    sameSite:isproduction?'none':'lax',
 })
 res.cookie('rf_token',RefreshToken,{
-    httpOnly:true,
-    secure:false,
+       httpOnly:true,
+    secure:isproduction?true:false,
     maxAge:1000*60*60*24*7,
-    sameSite:'lax'
+    sameSite:isproduction?'none':'lax',
 })
 }
 if(error){
