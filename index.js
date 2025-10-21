@@ -8,7 +8,7 @@ import previewurls from "./previewsection/preview.js";
 import designdetails from "./designdetials/user_design_details.js";
 import signup from "./authentication/signup.js";
 import login from "./authentication/login.js";
-import redirecturl from "./supabase/redirecturl.js";
+import redirecturl from "./RedirectUrls/redirecturl.js";
 import fetching from "./fetch/profile.js";
 
 const app = express();
