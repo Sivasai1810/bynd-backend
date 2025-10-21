@@ -9,7 +9,7 @@ import designdetails from "./designdetials/user_design_details.js";
 import signup from "./authentication/signup.js";
 import login from "./authentication/login.js";
 import redirecturl from "./RedirectUrls/redirecturl.js";
-import fetching from "./fetch/profile.js";
+import fetching from "./profilefetching/fetchingprofile.js";
 
 const app = express();
 app.use(express.json());
