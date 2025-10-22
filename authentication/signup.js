@@ -40,12 +40,14 @@ res.cookie('ac_token',AccessToken,{
     secure:isproduction?true:false,
     maxAge:1000*60*60*24*2,
     sameSite:isproduction?'none':'lax',
+    path:'/',
 })
 res.cookie('rf_token',RefreshToken,{
        httpOnly:true,
     secure:isproduction?true:false,
     maxAge:1000*60*60*24*7,
     sameSite:isproduction?'none':'lax',
+    path:'/,'
 })
 }
 if(error){
