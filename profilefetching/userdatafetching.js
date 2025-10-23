@@ -5,45 +5,32 @@ import verifyToken from "../middlewares/verifytoken.js";
 const router = express.Router();
 
 // Get all submissions for the authenticated user
-router.get('', verifyToken, async (req, res) => {
+router.get('', async (req, res) => {
   try {
-    const user_id = req.user;
+    const user_id = req.query.user_id;
     console.log("Fetching data for user ID:", user_id);
 
-    // Fetch user data from database
-    const { data: userData, error } = await supabase_connect
-      .from("user_urls")
+    // Fetch all submissions for this user with optimized query
+    const { data: submissions, error } = await supabase_connect
+      .from("design_submissions")
       .select("*")
       .eq("user_id", user_id)
-      .single();
+      .order('created_at', { ascending: false }); // Most recent first
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error("Fetch error:", error.message);
       return res.status(500).json({ error: error.message });
     }
 
-    // If user not found or no data
-    if (!userData || !userData.shareable_link || userData.shareable_link.length === 0) {
+    // If no submissions found
+    if (!submissions || submissions.length === 0) {
       return res.status(200).json({ 
         message: "No submissions found",
         submissions: []
       });
     }
 
-    // Transform arrays into array of objects
-    const submissions = userData.shareable_link.map((link, index) => ({
-      id: index + 1,
-      shareable_link: link,
-      companyname: userData.companyname[index] || 'N/A',
-      position: userData.position[index] || 'N/A',
-      status: userData.status[index] || 'pending',
-      created_at: userData.created_at[index] || null,
-      pasted_url: userData.pasted_url[index] || null,
-      preview_url: userData.preview_url[index] || null,
-      unique_id: userData.unique_id[index] || null
-    }));
-
-    // console.log(`Found ${submissions.length} submissions for user ${user_id}`);
+    console.log(`Found ${submissions.length} submissions for user ${user_id}`);
 
     return res.status(200).json({
       message: "Data fetched successfully",
@@ -57,7 +44,7 @@ router.get('', verifyToken, async (req, res) => {
   }
 });
 
-// Get specific submission by unique_id (public route - no auth)
+// Get specific submission by unique_id (public route - no auth needed)
 router.get('/public/:uniqueId', async (req, res) => {
   try {
     const { uniqueId } = req.params;
@@ -66,43 +53,40 @@ router.get('/public/:uniqueId', async (req, res) => {
       return res.status(400).json({ error: "Missing unique ID" });
     }
 
-    // Search all users for this unique_id
-    const { data: allUsers, error } = await supabase_connect
-      .from("user_urls")
-      .select("*");
+    // Direct indexed lookup - MUCH faster!
+    const { data: submission, error } = await supabase_connect
+      .from("design_submissions")
+      .select("*")
+      .eq('unique_id', uniqueId)
+      .single();
 
     if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned
+        return res.status(404).json({ error: "Submission not found" });
+      }
       console.error("Fetch error:", error.message);
       return res.status(500).json({ error: error.message });
     }
 
-    // Find the user and index where this unique_id exists
-    let foundSubmission = null;
-    for (const user of allUsers) {
-      if (user.unique_id && user.unique_id.includes(uniqueId)) {
-        const index = user.unique_id.indexOf(uniqueId);
-        
-        foundSubmission = {
-          shareable_link: user.shareable_link[index],
-          companyname: user.companyname[index],
-          position: user.position[index],
-          status: user.status[index],
-          created_at: user.created_at[index],
-          pasted_url: user.pasted_url[index],
-          preview_url: user.preview_url[index],
-          unique_id: uniqueId
-        };
-        break;
-      }
-    }
-
-    if (!foundSubmission) {
+    if (!submission) {
       return res.status(404).json({ error: "Submission not found" });
     }
 
+    // Optional: Track views asynchronously
+    supabase_connect
+      .from("design_submissions")
+      .update({ 
+        total_views: (submission.total_views || 0) + 1,
+        last_viewed_at: new Date().toISOString()
+      })
+      .eq('id', submission.id)
+      .then(() => {})
+      .catch(err => console.error("View tracking error:", err));
+
     return res.status(200).json({
       message: "Submission found",
-      submission: foundSubmission
+      submission: submission
     });
 
   } catch (err) {

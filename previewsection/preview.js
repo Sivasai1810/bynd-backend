@@ -11,46 +11,60 @@ router.get('/:uniqueId', async (req, res) => {
     if (!uniqueId) {
       return res.status(400).json({ error: "Missing unique ID" });
     }
-    // Search all users for this unique_id
-    const { data: allUsers, error } = await supabase_connect
-      .from("user_urls")
-      .select("*");
+
+    // Direct indexed lookup
+    const { data: design, error } = await supabase_connect
+      .from("design_submissions")
+      .select("*")
+      .eq('unique_id', uniqueId)
+      .single();
 
     if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: "Design not found" });
+      }
       console.error("Fetch error:", error.message);
       return res.status(500).json({ error: error.message });
     }
 
-    // Find the user and index where this unique_id exists
-    let foundData = null;
-    for (const user of allUsers) {
-      if (user.unique_id && user.unique_id.includes(uniqueId)) {
-        const index = user.unique_id.indexOf(uniqueId);
-        
-        foundData = {
-          preview_url: user.preview_url[index],
-          pasted_url: user.pasted_url[index],
-          companyname: user.companyname[index],
-          position: user.position[index],
-          status: user.status[index],
-          created_at: user.created_at[index]
-        };
-        break;
-      }
-    }
-
-    if (!foundData) {
+    if (!design) {
       return res.status(404).json({ error: "Design not found" });
     }
 
-    // Return HTML page with embedded Figma design
-  const html = `
+    // Track views asynchronously
+    supabase_connect
+      .from("design_submissions")
+      .update({ 
+        total_views: (design.total_views || 0) + 1,
+        last_viewed_at: new Date().toISOString()
+      })
+      .eq('id', design.id)
+      .then(() => {})
+      .catch(err => console.error("View tracking error:", err));
+
+    // Determine URLs
+    let previewImageUrl = design.preview_thumbnail;
+    let fullViewUrl = design.embed_url;
+    
+    if (design.design_type === 'pdf') {
+      const { data } = supabase_connect.storage
+        .from('design_files')
+        .getPublicUrl(design.pdf_file_path);
+      fullViewUrl = data.publicUrl;
+    }
+
+    // Return optimized HTML with screenshot preview
+    const html = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${foundData.companyname} - ${foundData.position}</title>
+      <title>${design.company_name} - ${design.position}</title>
+      
+      <!-- Preload preview image for instant display -->
+      ${previewImageUrl ? `<link rel="preload" href="${previewImageUrl}" as="image">` : ''}
+      
       <style>
         * {
           margin: 0;
@@ -69,6 +83,9 @@ router.get('/:uniqueId', async (req, res) => {
           background: white;
           padding: 24px 40px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+          position: sticky;
+          top: 0;
+          z-index: 100;
         }
         .header h1 {
           color: #1a1a1a;
@@ -80,6 +97,19 @@ router.get('/:uniqueId', async (req, res) => {
           color: #666;
           font-size: 13px;
         }
+        .badge {
+          display: inline-block;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          margin-left: 8px;
+        }
+        .badge.pending { background: #FFF4E6; color: #F59E0B; }
+        .badge.approved { background: #D1FAE5; color: #059669; }
+        .badge.rejected { background: #FEE2E2; color: #DC2626; }
+        
         .container {
           flex: 1;
           display: flex;
@@ -88,69 +118,195 @@ router.get('/:uniqueId', async (req, res) => {
           padding: 20px;
           position: relative;
         }
-        .figma-wrapper {
+        
+        .design-wrapper {
           width: 100%;
           max-width: 1400px;
           height: 85vh;
           border-radius: 8px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
           background: white;
-          overflow: scroll;
-          -webkit-overflow-scrolling: touch;
           position: relative;
           border: 1px solid #e5e5e5;
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none; /* IE and Edge */
+          overflow: hidden;
         }
-        .figma-wrapper::-webkit-scrollbar {
-          display: none; /* Chrome, Safari, Opera */
-        }
-        .figma-frame {
+        
+        /* Preview Image (loads instantly) */
+        .preview-container {
           width: 100%;
-          min-width: 1200px;
           height: 100%;
-          min-height: 800px;
-          border: none;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #f9fafb;
+          cursor: pointer;
+          transition: transform 0.2s ease;
+        }
+        
+        .preview-container:hover {
+          transform: scale(1.01);
+        }
+        
+        .preview-image {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
           display: block;
         }
-        .overlay {
+        
+        .preview-overlay {
           position: absolute;
           top: 0;
           left: 0;
           right: 0;
-          height: 60px;
-          background: white;
-          z-index: 999;
-          pointer-events: all;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          color: white;
         }
-        .copy-btn {
+        
+        .preview-container:hover .preview-overlay {
+          opacity: 1;
+        }
+        
+        .play-icon {
+          font-size: 64px;
+          margin-bottom: 16px;
+        }
+        
+        .preview-text {
+          font-size: 18px;
+          font-weight: 600;
+        }
+        
+        /* Full View Iframe (loads on demand) */
+        .iframe-container {
+          width: 100%;
+          height: 100%;
+          display: none;
+          position: relative;
+        }
+        
+        .iframe-container.active {
+          display: block;
+        }
+        
+        .design-frame {
+          width: 100%;
+          height: 100%;
+          border: none;
+        }
+        
+        .loading-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: white;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 10;
+        }
+        
+        .loading-overlay.hidden {
+          display: none;
+        }
+        
+        .spinner {
+          width: 48px;
+          height: 48px;
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #1DBC79;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+          margin-top: 16px;
+          color: #666;
+          font-size: 14px;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
           position: fixed;
           bottom: 30px;
           right: 30px;
-          background: #1DBC79;
-          color: white;
-          border: none;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          z-index: 1000;
+        }
+        
+        .btn {
           padding: 12px 24px;
           border-radius: 6px;
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          box-shadow: 0 2px 8px rgba(29, 188, 121, 0.3);
+          border: none;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
           transition: all 0.2s ease;
-          z-index: 1000;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
         }
-        .copy-btn:hover {
-          background: #18a865;
+        
+        .btn:hover {
           transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(29, 188, 121, 0.4);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
-        .copy-btn:active {
-          transform: translateY(0);
+        
+        .btn-primary {
+          background: #1DBC79;
+          color: white;
         }
+        
+        .btn-primary:hover {
+          background: #18a865;
+        }
+        
+        .btn-secondary {
+          background: #4A90E2;
+          color: white;
+        }
+        
+        .btn-secondary:hover {
+          background: #3a7bc8;
+        }
+        
+        .btn-back {
+          background: #6B7280;
+          color: white;
+          display: none;
+        }
+        
+        .btn-back.visible {
+          display: inline-flex;
+        }
+        
+        .btn-back:hover {
+          background: #4B5563;
+        }
+        
         .copied {
           position: fixed;
-          bottom: 100px;
+          bottom: 170px;
           right: 30px;
           background: #1DBC79;
           color: white;
@@ -163,39 +319,129 @@ router.get('/:uniqueId', async (req, res) => {
           box-shadow: 0 2px 8px rgba(29, 188, 121, 0.3);
           z-index: 1000;
         }
+        
         .copied.show {
           opacity: 1;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+          .header {
+            padding: 16px 20px;
+          }
+          .header h1 {
+            font-size: 16px;
+          }
+          .action-buttons {
+            right: 20px;
+            bottom: 20px;
+          }
+          .btn {
+            padding: 10px 20px;
+            font-size: 13px;
+          }
         }
       </style>
     </head>
     <body>
       <div class="header">
-        <h1>${foundData.companyname} - ${foundData.position}</h1>
-        <p>Design Submission • Status: ${foundData.status}</p>
+        <h1>
+          ${design.company_name} - ${design.position}
+          <span class="badge ${design.status}">${design.status}</span>
+        </h1>
+        <p>Design Submission • ${design.design_type.toUpperCase()} • Submitted ${new Date(design.created_at).toLocaleDateString()}</p>
       </div>
       
       <div class="container">
-        <div class="figma-wrapper">
-          <div class="overlay"></div>
-          <iframe 
-            class="figma-frame"
-            src="${foundData.preview_url}"
-            allowfullscreen
-            sandbox="allow-same-origin allow-scripts allow-popups"
-            scrolling="yes"
-          ></iframe>
+        <div class="design-wrapper">
+          <!-- Preview Image (loads instantly) -->
+          <div class="preview-container" id="previewContainer" onclick="loadFullView()">
+            ${previewImageUrl ? `
+              <img src="${previewImageUrl}" alt="Design Preview" class="preview-image">
+              <div class="preview-overlay">
+                <div class="play-icon">▶</div>
+                <div class="preview-text">Click to view full design</div>
+              </div>
+            ` : `
+              <div class="preview-overlay" style="opacity: 1; background: rgba(0,0,0,0.1);">
+                <div class="preview-text" style="color: #666;">Click to load design</div>
+              </div>
+            `}
+          </div>
+          
+          <!-- Full View Iframe (loads on demand) -->
+          <div class="iframe-container" id="iframeContainer">
+            <div class="loading-overlay" id="loadingOverlay">
+              <div class="spinner"></div>
+              <div class="loading-text">Loading full design...</div>
+            </div>
+            <iframe 
+              id="designFrame"
+              class="design-frame"
+              data-src="${fullViewUrl}"
+              ${design.design_type === 'figma' ? 'sandbox="allow-same-origin allow-scripts allow-popups"' : ''}
+            ></iframe>
+          </div>
         </div>
       </div>
 
-      <button class="copy-btn" onclick="copyLink()">
-         Copy Link
-      </button>
+      <div class="action-buttons">
+        <button class="btn btn-back" id="backBtn" onclick="showPreview()">
+          ← Back to Preview
+        </button>
+        
+  
+        
+        <button class="btn btn-primary" onclick="copyLink()">
+          📋 Copy Link
+        </button>
+      </div>
 
       <div class="copied" id="copiedMsg">
         ✓ Link copied!
       </div>
 
       <script>
+        let isFullViewLoaded = false;
+        
+        const previewContainer = document.getElementById('previewContainer');
+        const iframeContainer = document.getElementById('iframeContainer');
+        const designFrame = document.getElementById('designFrame');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const backBtn = document.getElementById('backBtn');
+        
+        function loadFullView() {
+          // Hide preview, show iframe
+          previewContainer.style.display = 'none';
+          iframeContainer.classList.add('active');
+          backBtn.classList.add('visible');
+          
+          if (!isFullViewLoaded) {
+            // Load iframe for the first time
+            const src = designFrame.getAttribute('data-src');
+            designFrame.src = src;
+            isFullViewLoaded = true;
+            
+            // Hide loading overlay after timeout
+            setTimeout(() => {
+              loadingOverlay.classList.add('hidden');
+            }, 3000);
+            
+            designFrame.onload = function() {
+              loadingOverlay.classList.add('hidden');
+            };
+          } else {
+            // Already loaded, just hide loading
+            loadingOverlay.classList.add('hidden');
+          }
+        }
+        
+        function showPreview() {
+          previewContainer.style.display = 'flex';
+          iframeContainer.classList.remove('active');
+          backBtn.classList.remove('visible');
+        }
+        
         function copyLink() {
           const link = window.location.href;
           navigator.clipboard.writeText(link).then(() => {
@@ -204,6 +450,9 @@ router.get('/:uniqueId', async (req, res) => {
             setTimeout(() => {
               msg.classList.remove('show');
             }, 2000);
+          }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy link');
           });
         }
       </script>
@@ -215,7 +464,10 @@ router.get('/:uniqueId', async (req, res) => {
 
   } catch (err) {
     console.error("Server error:", err);
-    res.status(500).json({ error: "Server error occurred" });
+    res.status(500).json({ 
+      error: "Server error occurred",
+      details: err.message 
+    });
   }
 });
 
