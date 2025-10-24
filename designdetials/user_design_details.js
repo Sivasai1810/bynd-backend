@@ -165,7 +165,7 @@ function generateUrls(figmaUrl, uniqueId) {
     ? `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(figmaUrl)}&chrome=DOCUMENTATION&hide-ui=1`
     : null;
   
-  const shareableLink = `${process.env.BASE_URL || 'http://localhost:3000'}BYNDLINK/view/${uniqueId}`;
+  const shareableLink = `https://bynd-backend.onrender.com/BYNDLINK/view/${uniqueId}`;
   
   return { embedUrl, shareableLink };
 }
