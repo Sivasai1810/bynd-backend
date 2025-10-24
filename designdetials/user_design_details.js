@@ -165,7 +165,7 @@ function generateUrls(figmaUrl, uniqueId) {
     ? `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(figmaUrl)}&chrome=DOCUMENTATION&hide-ui=1`
     : null;
   
-  const shareableLink = `${process.env.BASE_URL || 'http://localhost:3000'}/view/${uniqueId}`;
+  const shareableLink = `${process.env.BASE_URL || 'http://localhost:3000'}BYNDLINK/view/${uniqueId}`;
   
   return { embedUrl, shareableLink };
 }
@@ -199,7 +199,7 @@ async function generatePreviewScreenshot(embedUrl, uniqueId, userId) {
     });
     
     // Wait a bit for Figma to render
-    await page.waitForTimeout(3000);
+  await page.waitForTimeout(3000);
     
     // Take screenshot
     const screenshot = await page.screenshot({ 

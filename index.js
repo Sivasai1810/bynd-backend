@@ -10,6 +10,7 @@ import signup from "./authentication/signup.js";
 import login from "./authentication/login.js";
 import redirecturl from "./RedirectUrls/redirecturl.js";
 import fetching from "./profilefetching/fetchingprofile.js";
+import getstats from "./analytics/userstats.js"
 
 const app = express();
 app.use(express.json());
@@ -39,8 +40,9 @@ app.use('/auth/login', login);
 app.use('/supabase/redirecturl', redirecturl);
 app.use('/fetch/profile', fetching);
 app.use('/storeurls', designdetails);
-app.use('/preview', previewurls);
+app.use('/BYNDLINK/view', previewurls);
 app.use('/userurls', userurl);
+app.use('/userurls',getstats)
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
