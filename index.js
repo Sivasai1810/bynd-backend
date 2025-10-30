@@ -11,6 +11,7 @@ import login from "./authentication/login.js";
 import redirecturl from "./RedirectUrls/redirecturl.js";
 import fetching from "./profilefetching/fetchingprofile.js";
 import getstats from "./analytics/userstats.js"
+import Delete from "./designdetials/deletedesign.js"
 
 const app = express();
 app.use(express.json());
@@ -43,6 +44,7 @@ app.use('/storeurls', designdetails);
 app.use('/BYNDLINK/view', previewurls);
 app.use('/userurls', userurl);
 app.use('/userurls',getstats)
+app.use('/submissions',Delete)
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
