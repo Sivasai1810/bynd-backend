@@ -1,489 +1,15 @@
 // import express from "express";
 // import { supabase_connect } from "../supabase/set-up.js";
-
-// const router = express.Router();
-
-// // Get preview by unique ID
-// router.get('/:uniqueId', async (req, res) => {
-//   try {
-//     const { uniqueId } = req.params;
-
-//     if (!uniqueId) {
-//       return res.status(400).json({ error: "Missing unique ID" });
-//     }
-
-//     // Direct indexed lookup
-//     const { data: design, error } = await supabase_connect
-//       .from("design_submissions")
-//       .select("*")
-//       .eq('unique_id', uniqueId)
-//       .single();
-
-//     if (error) {
-//       if (error.code === 'PGRST116') {
-//         return res.status(404).json({ error: "Design not found" });
-//       }
-//       console.error("Fetch error:", error.message);
-//       return res.status(500).json({ error: error.message });
-//     }
-
-//     if (!design) {
-//       return res.status(404).json({ error: "Design not found" });
-//     }
-
-//     // Track views asynchronously
-//     supabase_connect
-//       .from("design_submissions")
-//       .update({ 
-//         total_views: (design.total_views || 0) + 1,
-//         last_viewed_at: new Date().toISOString()
-//       })
-//       .eq('id', design.id)
-//       .then(() => {})
-//       .catch(err => console.error("View tracking error:", err));
-
-//     // Determine URLs
-//     let previewImageUrl = design.preview_thumbnail;
-//     let fullViewUrl = design.embed_url;
-    
-//     if (design.design_type === 'pdf') {
-//       const { data } = supabase_connect.storage
-//         .from('design_files')
-//         .getPublicUrl(design.pdf_file_path);
-//       fullViewUrl = data.publicUrl;
-//     }
-
-//     // Return optimized HTML with screenshot preview
-//     const html = `
-//     <!DOCTYPE html>
-//     <html lang="en">
-//     <head>
-//       <meta charset="UTF-8">
-//       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-//       <title>${design.company_name} - ${design.position}</title>
-      
-//       <!-- Preload preview image for instant display -->
-//       ${previewImageUrl ? `<link rel="preload" href="${previewImageUrl}" as="image">` : ''}
-      
-//       <style>
-//         * {
-//           margin: 0;
-//           padding: 0;
-//           box-sizing: border-box;
-//         }
-//         body {
-//           background: #f5f5f5;
-//           min-height: 100vh;
-//           display: flex;
-//           flex-direction: column;
-//           overflow-x: hidden;
-//           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-//         }
-//         .header {
-//           background: white;
-//           padding: 24px 40px;
-//           box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-//           position: sticky;
-//           top: 0;
-//           z-index: 100;
-//         }
-//         .header h1 {
-//           color: #1a1a1a;
-//           font-size: 20px;
-//           margin-bottom: 6px;
-//           font-weight: 600;
-//         }
-//         .header p {
-//           color: #666;
-//           font-size: 13px;
-//         }
-//         .badge {
-//           display: inline-block;
-//           padding: 4px 8px;
-//           border-radius: 4px;
-//           font-size: 12px;
-//           font-weight: 600;
-//           text-transform: uppercase;
-//           margin-left: 8px;
-//         }
-//         .badge.pending { background: #FFF4E6; color: #F59E0B; }
-//         .badge.approved { background: #D1FAE5; color: #059669; }
-//         .badge.rejected { background: #FEE2E2; color: #DC2626; }
-        
-//         .container {
-//           flex: 1;
-//           display: flex;
-//           justify-content: center;
-//           align-items: center;
-//           padding: 20px;
-//           position: relative;
-//         }
-        
-//         .design-wrapper {
-//           width: 100%;
-//           max-width: 1400px;
-//           height: 85vh;
-//           border-radius: 8px;
-//           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-//           background: white;
-//           position: relative;
-//           border: 1px solid #e5e5e5;
-//           overflow: hidden;
-//         }
-        
-//         /* Preview Image (loads instantly) */
-//         .preview-container {
-//           width: 100%;
-//           height: 100%;
-//           position: relative;
-//           display: flex;
-//           align-items: center;
-//           justify-content: center;
-//           background: #f9fafb;
-//           cursor: pointer;
-//           transition: transform 0.2s ease;
-//         }
-        
-//         .preview-container:hover {
-//           transform: scale(1.01);
-//         }
-        
-//         .preview-image {
-//           max-width: 100%;
-//           max-height: 100%;
-//           object-fit: contain;
-//           display: block;
-//         }
-        
-//         .preview-overlay {
-//           position: absolute;
-//           top: 0;
-//           left: 0;
-//           right: 0;
-//           bottom: 0;
-//           background: rgba(0, 0, 0, 0.5);
-//           display: flex;
-//           flex-direction: column;
-//           align-items: center;
-//           justify-content: center;
-//           opacity: 0;
-//           transition: opacity 0.3s ease;
-//           color: white;
-//         }
-        
-//         .preview-container:hover .preview-overlay {
-//           opacity: 1;
-//         }
-        
-//         .play-icon {
-//           font-size: 64px;
-//           margin-bottom: 16px;
-//         }
-        
-//         .preview-text {
-//           font-size: 18px;
-//           font-weight: 600;
-//         }
-        
-//         /* Full View Iframe (loads on demand) */
-//         .iframe-container {
-//           width: 100%;
-//           height: 100%;
-//           display: none;
-//           position: relative;
-//         }
-        
-//         .iframe-container.active {
-//           display: block;
-//         }
-        
-//         .design-frame {
-//           width: 100%;
-//           height: 100%;
-//           border: none;
-//         }
-        
-//         .loading-overlay {
-//           position: absolute;
-//           top: 0;
-//           left: 0;
-//           right: 0;
-//           bottom: 0;
-//           background: white;
-//           display: flex;
-//           flex-direction: column;
-//           align-items: center;
-//           justify-content: center;
-//           z-index: 10;
-//         }
-        
-//         .loading-overlay.hidden {
-//           display: none;
-//         }
-        
-//         .spinner {
-//           width: 48px;
-//           height: 48px;
-//           border: 4px solid #f3f3f3;
-//           border-top: 4px solid #1DBC79;
-//           border-radius: 50%;
-//           animation: spin 1s linear infinite;
-//         }
-        
-//         @keyframes spin {
-//           0% { transform: rotate(0deg); }
-//           100% { transform: rotate(360deg); }
-//         }
-        
-//         .loading-text {
-//           margin-top: 16px;
-//           color: #666;
-//           font-size: 14px;
-//         }
-        
-//         /* Action Buttons */
-//         .action-buttons {
-//           position: fixed;
-//           bottom: 30px;
-//           right: 30px;
-//           display: flex;
-//           flex-direction: column;
-//           gap: 12px;
-//           z-index: 1000;
-//         }
-        
-//         .btn {
-//           padding: 12px 24px;
-//           border-radius: 6px;
-//           font-size: 14px;
-//           font-weight: 600;
-//           cursor: pointer;
-//           border: none;
-//           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-//           transition: all 0.2s ease;
-//           display: inline-flex;
-//           align-items: center;
-//           gap: 8px;
-//           text-decoration: none;
-//         }
-        
-//         .btn:hover {
-//           transform: translateY(-1px);
-//           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-//         }
-        
-//         .btn-primary {
-//           background: #1DBC79;
-//           color: white;
-//         }
-        
-//         .btn-primary:hover {
-//           background: #18a865;
-//         }
-        
-//         .btn-secondary {
-//           background: #4A90E2;
-//           color: white;
-//         }
-        
-//         .btn-secondary:hover {
-//           background: #3a7bc8;
-//         }
-        
-//         .btn-back {
-//           background: #6B7280;
-//           color: white;
-//           display: none;
-//         }
-        
-//         .btn-back.visible {
-//           display: inline-flex;
-//         }
-        
-//         .btn-back:hover {
-//           background: #4B5563;
-//         }
-        
-//         .copied {
-//           position: fixed;
-//           bottom: 170px;
-//           right: 30px;
-//           background: #1DBC79;
-//           color: white;
-//           padding: 12px 24px;
-//           border-radius: 6px;
-//           font-weight: 600;
-//           opacity: 0;
-//           transition: opacity 0.3s ease;
-//           pointer-events: none;
-//           box-shadow: 0 2px 8px rgba(29, 188, 121, 0.3);
-//           z-index: 1000;
-//         }
-        
-//         .copied.show {
-//           opacity: 1;
-//         }
-        
-//         /* Responsive */
-//         @media (max-width: 768px) {
-//           .header {
-//             padding: 16px 20px;
-//           }
-//           .header h1 {
-//             font-size: 16px;
-//           }
-//           .action-buttons {
-//             right: 20px;
-//             bottom: 20px;
-//           }
-//           .btn {
-//             padding: 10px 20px;
-//             font-size: 13px;
-//           }
-//         }
-//       </style>
-//     </head>
-//     <body>
-//       <div class="header">
-//         <h1>
-//           ${design.company_name} - ${design.position}
-//           <span class="badge ${design.status}">${design.status}</span>
-//         </h1>
-//         <p>Design Submission • ${design.design_type.toUpperCase()} • Submitted ${new Date(design.created_at).toLocaleDateString()}</p>
-//       </div>
-      
-//       <div class="container">
-//         <div class="design-wrapper">
-//           <!-- Preview Image (loads instantly) -->
-//           <div class="preview-container" id="previewContainer" onclick="loadFullView()">
-//             ${previewImageUrl ? `
-//               <img src="${previewImageUrl}" alt="Design Preview" class="preview-image">
-//               <div class="preview-overlay">
-//                 <div class="play-icon">▶</div>
-//                 <div class="preview-text">Click to view full design</div>
-//               </div>
-//             ` : `
-//               <div class="preview-overlay" style="opacity: 1; background: rgba(0,0,0,0.1);">
-//                 <div class="preview-text" style="color: #666;">Click to load design</div>
-//               </div>
-//             `}
-//           </div>
-          
-//           <!-- Full View Iframe (loads on demand) -->
-//           <div class="iframe-container" id="iframeContainer">
-//             <div class="loading-overlay" id="loadingOverlay">
-//               <div class="spinner"></div>
-//               <div class="loading-text">Loading full design...</div>
-//             </div>
-//             <iframe 
-//               id="designFrame"
-//               class="design-frame"
-//               data-src="${fullViewUrl}"
-//               ${design.design_type === 'figma' ? 'sandbox="allow-same-origin allow-scripts allow-popups"' : ''}
-//             ></iframe>
-//           </div>
-//         </div>
-//       </div>
-
-//       <div class="action-buttons">
-//         <button class="btn btn-back" id="backBtn" onclick="showPreview()">
-//           ← Back to Preview
-//         </button>
-        
-  
-        
-//         <button class="btn btn-primary" onclick="copyLink()">
-//           📋 Copy Link
-//         </button>
-//       </div>
-
-//       <div class="copied" id="copiedMsg">
-//         ✓ Link copied!
-//       </div>
-
-//       <script>
-//         let isFullViewLoaded = false;
-        
-//         const previewContainer = document.getElementById('previewContainer');
-//         const iframeContainer = document.getElementById('iframeContainer');
-//         const designFrame = document.getElementById('designFrame');
-//         const loadingOverlay = document.getElementById('loadingOverlay');
-//         const backBtn = document.getElementById('backBtn');
-        
-//         function loadFullView() {
-//           // Hide preview, show iframe
-//           previewContainer.style.display = 'none';
-//           iframeContainer.classList.add('active');
-//           backBtn.classList.add('visible');
-          
-//           if (!isFullViewLoaded) {
-//             // Load iframe for the first time
-//             const src = designFrame.getAttribute('data-src');
-//             designFrame.src = src;
-//             isFullViewLoaded = true;
-            
-//             // Hide loading overlay after timeout
-//             setTimeout(() => {
-//               loadingOverlay.classList.add('hidden');
-//             }, 3000);
-            
-//             designFrame.onload = function() {
-//               loadingOverlay.classList.add('hidden');
-//             };
-//           } else {
-//             // Already loaded, just hide loading
-//             loadingOverlay.classList.add('hidden');
-//           }
-//         }
-        
-//         function showPreview() {
-//           previewContainer.style.display = 'flex';
-//           iframeContainer.classList.remove('active');
-//           backBtn.classList.remove('visible');
-//         }
-        
-//         function copyLink() {
-//           const link = window.location.href;
-//           navigator.clipboard.writeText(link).then(() => {
-//             const msg = document.getElementById('copiedMsg');
-//             msg.classList.add('show');
-//             setTimeout(() => {
-//               msg.classList.remove('show');
-//             }, 2000);
-//           }).catch(err => {
-//             console.error('Failed to copy:', err);
-//             alert('Failed to copy link');
-//           });
-//         }
-//       </script>
-//     </body>
-//     </html>
-//     `;
-
-//     res.send(html);
-
-//   } catch (err) {
-//     console.error("Server error:", err);
-//     res.status(500).json({ 
-//       error: "Server error occurred",
-//       details: err.message 
-//     });
-//   }
-// });
-
-// export default router;
-// import express from "express";
-// import { supabase_connect } from "../supabase/set-up.js";
 // import cookieParser from "cookie-parser";
 
 // const router = express.Router();
 // router.use(cookieParser());
 
-// // Get preview by unique ID
+// // Get preview by unique ID with layers
 // router.get('/:uniqueId', async (req, res) => {
 //   try {
 //     const { uniqueId } = req.params;
-// console.log(uniqueId)
+
 //     if (!uniqueId) {
 //       return res.status(400).json({ error: "Missing unique ID" });
 //     }
@@ -507,537 +33,41 @@
 //       return res.status(404).json({ error: "Design not found" });
 //     }
 
-//     // ===== VIEW TRACKING LOGIC =====
-//     const viewCookieName = `viewed_${uniqueId}`;
-//     const hasViewedBefore = req.cookies[viewCookieName];
+//     // Fetch layers if Figma design (ordered by layer_order)
+//     let layers = [];
+//     if (design.design_type === 'figma') {
+//       const { data: layersData, error: layersError } = await supabase_connect
+//         .from("design_layers")
+//         .select("*")
+//         .eq('submission_id', design.id)
+//         .order('layer_order', { ascending: true });
 
-//     if (!hasViewedBefore) {
-//       // First time viewing this design - track it!
-//       const currentViews = design.total_views || 0;
-      
-//       // IMPORTANT: Change status from 'pending' to 'viewed' on first view
-//       const newStatus = design.status === 'pending' ? 'viewed' : design.status;
-
-//       // Update view count, timestamp, and status
-//       const { error: updateError } = await supabase_connect
-//         .from("design_submissions")
-//         .update({ 
-//           total_views: currentViews + 1,
-//           last_viewed_at: new Date().toISOString(),
-//           status: newStatus // Update status to 'viewed'
-//         })
-//         .eq('id', design.id);
-
-//       if (updateError) {
-//         console.error("View update error:", updateError);
-//       } else {
-//         console.log(`✅ View tracked for ${uniqueId}. Status: ${design.status} → ${newStatus}, Views: ${currentViews} → ${currentViews + 1}`);
-//       }
-
-//       // Set cookie to expire in 24 hours
-//       res.cookie(viewCookieName, 'true', {
-//         maxAge: 24 * 60 * 60 * 1000, // 24 hours
-//         httpOnly: true
-//       });
-
-//     } else {
-//       console.log(` Duplicate view prevented for ${uniqueId} (cookie exists)`);
-//     }
-
-//     // Determine URLs
-//     let previewImageUrl = design.preview_thumbnail;
-//     let fullViewUrl = design.embed_url;
-//  if (design.design_type === 'pdf') {
-//   // Use signed URL for private buckets (valid for 1 hour)
-//   const { data, error: signedUrlError } = await supabase_connect.storage
-//     .from('design_files')
-//     .createSignedUrl(design.pdf_file_path, 3600); // 3600 seconds = 1 hour
-  
-//   if (signedUrlError) {
-//     console.error("Signed URL error:", signedUrlError);
-//     return res.status(500).json({ error: "Failed to generate PDF URL" });
-//   }
-  
-//   fullViewUrl = data.signedUrl;
-// }
-
-//     // Return HTML (same as before)
-//     const html = `
-//     <!DOCTYPE html>
-//     <html lang="en">
-//     <head>
-//       <meta charset="UTF-8">
-//       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-//       <title>${design.company_name} - ${design.position}</title>
-      
-//       ${previewImageUrl ? `<link rel="preload" href="${previewImageUrl}" as="image">` : ''}
-      
-//       <style>
-//         * {
-//           margin: 0;
-//           padding: 0;
-//           box-sizing: border-box;
-//         }
-//         body {
-//           background: #f5f5f5;
-//           min-height: 100vh;
-//           display: flex;
-//           flex-direction: column;
-//           overflow-x: hidden;
-//           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-//         }
-//         .header {
-//           background: white;
-//           padding: 24px 40px;
-//           box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-//           position: sticky;
-//           top: 0;
-//           z-index: 100;
-//         }
-//         .header h1 {
-//           color: #1a1a1a;
-//           font-size: 20px;
-//           margin-bottom: 6px;
-//           font-weight: 600;
-//         }
-//         .header p {
-//           color: #666;
-//           font-size: 13px;
-//         }
-//         .badge {
-//           display: inline-block;
-//           padding: 4px 8px;
-//           border-radius: 4px;
-//           font-size: 12px;
-//           font-weight: 600;
-//           text-transform: uppercase;
-//           margin-left: 8px;
-//         }
-//         .badge.pending { background: #FFF4E6; color: #F59E0B; }
-//         .badge.viewed { background: #DBEAFE; color: #2563EB; }
-//         .badge.approved { background: #D1FAE5; color: #059669; }
-//         .badge.rejected { background: #FEE2E2; color: #DC2626; }
-        
-//         .container {
-//           flex: 1;
-//           display: flex;
-//           justify-content: center;
-//           align-items: center;
-//           padding: 20px;
-//           position: relative;
-//         }
-        
-//         .design-wrapper {
-//           width: 100%;
-//           max-width: 1400px;
-//           height: 85vh;
-//           border-radius: 8px;
-//           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-//           background: white;
-//           position: relative;
-//           border: 1px solid #e5e5e5;
-//           overflow: hidden;
-//         }
-        
-//         .preview-container {
-//           width: 100%;
-//           height: 100%;
-//           position: relative;
-//           display: flex;
-//           align-items: center;
-//           justify-content: center;
-//           background: #f9fafb;
-//           cursor: pointer;
-//           transition: transform 0.2s ease;
-//         }
-        
-//         .preview-container:hover {
-//           transform: scale(1.01);
-//         }
-        
-//         .preview-image {
-//           max-width: 100%;
-//           max-height: 100%;
-//           object-fit: contain;
-//           display: block;
-//         }
-        
-//         .preview-overlay {
-//           position: absolute;
-//           top: 0;
-//           left: 0;
-//           right: 0;
-//           bottom: 0;
-//           background: rgba(0, 0, 0, 0.5);
-//           display: flex;
-//           flex-direction: column;
-//           align-items: center;
-//           justify-content: center;
-//           opacity: 0;
-//           transition: opacity 0.3s ease;
-//           color: white;
-//         }
-        
-//         .preview-container:hover .preview-overlay {
-//           opacity: 1;
-//         }
-        
-//         .play-icon {
-//           font-size: 64px;
-//           margin-bottom: 16px;
-//         }
-        
-//         .preview-text {
-//           font-size: 18px;
-//           font-weight: 600;
-//         }
-        
-//         .iframe-container {
-//           width: 100%;
-//           height: 100%;
-//           display: none;
-//           position: relative;
-//         }
-        
-//         .iframe-container.active {
-//           display: block;
-//         }
-        
-//         .design-frame {
-//           width: 100%;
-//           height: 100%;
-//           border: none;
-//         }
-        
-//         .loading-overlay {
-//           position: absolute;
-//           top: 0;
-//           left: 0;
-//           right: 0;
-//           bottom: 0;
-//           background: white;
-//           display: flex;
-//           flex-direction: column;
-//           align-items: center;
-//           justify-content: center;
-//           z-index: 10;
-//         }
-        
-//         .loading-overlay.hidden {
-//           display: none;
-//         }
-        
-//         .spinner {
-//           width: 48px;
-//           height: 48px;
-//           border: 4px solid #f3f3f3;
-//           border-top: 4px solid #1DBC79;
-//           border-radius: 50%;
-//           animation: spin 1s linear infinite;
-//         }
-        
-//         @keyframes spin {
-//           0% { transform: rotate(0deg); }
-//           100% { transform: rotate(360deg); }
-//         }
-        
-//         .loading-text {
-//           margin-top: 16px;
-//           color: #666;
-//           font-size: 14px;
-//         }
-        
-//         .action-buttons {
-//           position: fixed;
-//           bottom: 30px;
-//           right: 30px;
-//           display: flex;
-//           flex-direction: column;
-//           gap: 12px;
-//           z-index: 1000;
-//         }
-        
-//         .btn {
-//           padding: 12px 24px;
-//           border-radius: 6px;
-//           font-size: 14px;
-//           font-weight: 600;
-//           cursor: pointer;
-//           border: none;
-//           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-//           transition: all 0.2s ease;
-//           display: inline-flex;
-//           align-items: center;
-//           gap: 8px;
-//           text-decoration: none;
-//         }
-        
-//         .btn:hover {
-//           transform: translateY(-1px);
-//           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-//         }
-        
-//         .btn-primary {
-//           background: #1DBC79;
-//           color: white;
-//         }
-        
-//         .btn-primary:hover {
-//           background: #18a865;
-//         }
-        
-//         .btn-back {
-//           background: #6B7280;
-//           color: white;
-//           display: none;
-//         }
-        
-//         .btn-back.visible {
-//           display: inline-flex;
-//         }
-        
-//         .btn-back:hover {
-//           background: #4B5563;
-//         }
-        
-//         .copied {
-//           position: fixed;
-//           bottom: 170px;
-//           right: 30px;
-//           background: #1DBC79;
-//           color: white;
-//           padding: 12px 24px;
-//           border-radius: 6px;
-//           font-weight: 600;
-//           opacity: 0;
-//           transition: opacity 0.3s ease;
-//           pointer-events: none;
-//           box-shadow: 0 2px 8px rgba(29, 188, 121, 0.3);
-//           z-index: 1000;
-//         }
-        
-//         .copied.show {
-//           opacity: 1;
-//         }
-        
-//         @media (max-width: 768px) {
-//           .header {
-//             padding: 16px 20px;
-//           }
-//           .header h1 {
-//             font-size: 16px;
-//           }
-//           .action-buttons {
-//             right: 20px;
-//             bottom: 20px;
-//           }
-//           .btn {
-//             padding: 10px 20px;
-//             font-size: 13px;
-//           }
-//         }
-//       </style>
-//     </head>
-//     <body>
-//       <div class="header">
-//         <h1>
-//           ${design.company_name} - ${design.position}
-//           <span class="badge ${design.status}">${design.status}</span>
-//         </h1>
-//         <p>Design Submission • ${design.design_type.toUpperCase()} • Submitted ${new Date(design.created_at).toLocaleDateString()}</p>
-//       </div>
-      
-//       <div class="container">
-//         <div class="design-wrapper">
-//           <div class="preview-container" id="previewContainer" onclick="loadFullView()">
-//             ${previewImageUrl ? `
-//               <img src="${previewImageUrl}" alt="Design Preview" class="preview-image">
-//               <div class="preview-overlay">
-//                 <div class="play-icon">▶</div>
-//                 <div class="preview-text">Click to view full design</div>
-//               </div>
-//             ` : `
-//               <div class="preview-overlay" style="opacity: 1; background: rgba(0,0,0,0.1);">
-//                 <div class="preview-text" style="color: #666;">Click to load design</div>
-//               </div>
-//             `}
-//           </div>
+//       if (!layersError && layersData) {
+//         // For each layer, fetch the preview image from storage
+//         // Path structure: userId/submissionId/layerName_layerOrder.png
+//         for (let layer of layersData) {
+//           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
+//           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
           
-//           <div class="iframe-container" id="iframeContainer">
-//             <div class="loading-overlay" id="loadingOverlay">
-//               <div class="spinner"></div>
-//               <div class="loading-text">Loading full design...</div>
-//             </div>
-//             <iframe 
-//               id="designFrame"
-//               class="design-frame"
-//               data-src="${fullViewUrl}"
-//               ${design.design_type === 'figma' ? 'sandbox="allow-same-origin allow-scripts allow-popups"' : ''}
-//             ></iframe>
-//           </div>
-//         </div>
-//       </div>
-
-//       <div class="action-buttons">
-//         <button class="btn btn-back" id="backBtn" onclick="showPreview()">
-//           ← Back to Preview
-//         </button>
-        
-//         <button class="btn btn-primary" onclick="copyLink()">
-//           Copy Link
-//         </button>
-//       </div>
-
-//       <div class="copied" id="copiedMsg">
-//         ✓ Link copied!
-//       </div>
-
-//       <script>
-//         let isFullViewLoaded = false;
-        
-//         const previewContainer = document.getElementById('previewContainer');
-//         const iframeContainer = document.getElementById('iframeContainer');
-//         const designFrame = document.getElementById('designFrame');
-//         const loadingOverlay = document.getElementById('loadingOverlay');
-//         const backBtn = document.getElementById('backBtn');
-        
-//         function loadFullView() {
-//           previewContainer.style.display = 'none';
-//           iframeContainer.classList.add('active');
-//           backBtn.classList.add('visible');
+//           // Try to get signed URL for this layer
+//           const { data: signedData, error: signedError } = await supabase_connect.storage
+//             .from('design_previews')
+//             .createSignedUrl(imagePath, 3600);
           
-//           if (!isFullViewLoaded) {
-//             const src = designFrame.getAttribute('data-src');
-//             designFrame.src = src;
-//             isFullViewLoaded = true;
-            
-//             setTimeout(() => {
-//               loadingOverlay.classList.add('hidden');
-//             }, 3000);
-            
-//             designFrame.onload = function() {
-//               loadingOverlay.classList.add('hidden');
-//             };
+//           if (!signedError && signedData) {
+//             layer.layer_preview_url = signedData.signedUrl;
 //           } else {
-//             loadingOverlay.classList.add('hidden');
+//             console.log(`⚠️ Could not fetch preview for layer: ${imagePath}`);
+//             layer.layer_preview_url = null;
 //           }
 //         }
         
-//         function showPreview() {
-//           previewContainer.style.display = 'flex';
-//           iframeContainer.classList.remove('active');
-//           backBtn.classList.remove('visible');
-//         }
-        
-//         function copyLink() {
-//           const link = window.location.href;
-//           navigator.clipboard.writeText(link).then(() => {
-//             const msg = document.getElementById('copiedMsg');
-//             msg.classList.add('show');
-//             setTimeout(() => {
-//               msg.classList.remove('show');
-//             }, 2000);
-//           }).catch(err => {
-//             console.error('Failed to copy:', err);
-//             alert('Failed to copy link');
-//           });
-//         }
-//       </script>
-//     </body>
-//     </html>
-//     `;
-
-//     res.send(html);
-
-//   } catch (err) {
-//     console.error("Server error:", err);
-//     res.status(500).json({ 
-//       error: "Server error occurred",
-//       details: err.message 
-//     });
-//   }
-// });
-
-// export default router;
-// import express from "express";
-// import { supabase_connect } from "../supabase/set-up.js";
-// import cookieParser from "cookie-parser";
-
-// const router = express.Router();
-// router.use(cookieParser());
-
-// // PDF proxy route - serves PDF with no-download headers
-// router.get('/pdf-viewer/:uniqueId', async (req, res) => {
-//   try {
-//     const { uniqueId } = req.params;
-
-//     // Fetch design from database
-//     const { data: design, error } = await supabase_connect
-//       .from("design_submissions")
-//       .select("*")
-//       .eq('unique_id', uniqueId)
-//       .single();
-
-//     if (error || !design || design.design_type !== 'pdf') {
-//       return res.status(404).send('PDF not found');
-//     }
-
-//     // Get signed URL
-//     const { data: signedUrlData, error: signedUrlError } = await supabase_connect.storage
-//       .from('design_files')
-//       .createSignedUrl(design.pdf_file_path, 3600);
-    
-//     if (signedUrlError) {
-//       return res.status(500).send('Error loading PDF');
-//     }
-
-//     // Fetch the PDF file
-//     const pdfResponse = await fetch(signedUrlData.signedUrl);
-//     const pdfBuffer = await pdfResponse.arrayBuffer();
-
-//     // Set headers to prevent download and force inline viewing
-//     res.setHeader('Content-Type', 'application/pdf');
-//     res.setHeader('Content-Disposition', 'inline; filename="design.pdf"');
-//     res.setHeader('X-Content-Type-Options', 'nosniff');
-//     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    
-//     // Send the PDF
-//     res.send(Buffer.from(pdfBuffer));
-
-//   } catch (err) {
-//     console.error("PDF viewer error:", err);
-//     res.status(500).send('Error loading PDF');
-//   }
-// });
-
-// // Get preview by unique ID
-// router.get('/:uniqueId', async (req, res) => {
-//   try {
-//     const { uniqueId } = req.params;
-//     console.log(uniqueId);
-
-//     if (!uniqueId) {
-//       return res.status(400).json({ error: "Missing unique ID" });
-//     }
-
-//     // Fetch design from database
-//     const { data: design, error } = await supabase_connect
-//       .from("design_submissions")
-//       .select("*")
-//       .eq('unique_id', uniqueId)
-//       .single();
-
-//     if (error) {
-//       if (error.code === 'PGRST116') {
-//         return res.status(404).json({ error: "Design not found" });
+//         layers = layersData;
 //       }
-//       console.error("Fetch error:", error.message);
-//       return res.status(500).json({ error: error.message });
 //     }
 
-//     if (!design) {
-//       return res.status(404).json({ error: "Design not found" });
-//     }
+//     // Calculate loading time based on layers count
+//     const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
 
 //     // ===== VIEW TRACKING LOGIC =====
 //     const viewCookieName = `viewed_${uniqueId}`;
@@ -1059,462 +89,425 @@
 //       if (updateError) {
 //         console.error("View update error:", updateError);
 //       } else {
-//         console.log(`✅ View tracked for ${uniqueId}. Status: ${design.status} → ${newStatus}, Views: ${currentViews} → ${currentViews + 1}`);
+//         console.log(`📊 View tracked for ${uniqueId}. Status: ${design.status} → ${newStatus}, Views: ${currentViews} → ${currentViews + 1}`);
 //       }
 
 //       res.cookie(viewCookieName, 'true', {
 //         maxAge: 24 * 60 * 60 * 1000,
 //         httpOnly: true
 //       });
+
 //     } else {
-//       console.log(`Duplicate view prevented for ${uniqueId} (cookie exists)`);
+//       console.log(`🔄 Duplicate view prevented for ${uniqueId} (cookie exists)`);
 //     }
 
-//     // Determine URLs
-//     let previewImageUrl = design.preview_thumbnail;
-//     let fullViewUrl = design.embed_url;
-//     let isPDF = false;
+//     // Generate signed URL for main preview thumbnail (used for PDF or default)
+//     let previewImageUrl = null;
+//     if (design.preview_thumbnail) {
+//       const { data: signedData, error: signedError } = await supabase_connect.storage
+//         .from('design_previews')
+//         .createSignedUrl(design.preview_thumbnail, 3600);
+      
+//       if (!signedError && signedData) {
+//         previewImageUrl = signedData.signedUrl;
+//       }
+//     }
 
+//     // Determine full view URL for PDF
+//     let fullViewUrl = null;
 //     if (design.design_type === 'pdf') {
-//       isPDF = true;
-//       // Use our proxy route instead of direct Supabase URL
-//       fullViewUrl = `/BYNDLINK/pdf-viewer/${uniqueId}#toolbar=0&navpanes=0&scrollbar=1`;
+//       const { data, error: signedUrlError } = await supabase_connect.storage
+//         .from('design_files')
+//         .createSignedUrl(design.pdf_file_path, 3600);
+      
+//       if (signedUrlError) {
+//         console.error("Signed URL error:", signedUrlError);
+//         return res.status(500).json({ error: "Failed to generate PDF URL" });
+//       }
+      
+//       fullViewUrl = data.signedUrl;
 //     }
 
-//     // Return HTML
-//     const html = `
-//     <!DOCTYPE html>
-//     <html lang="en">
-//     <head>
-//       <meta charset="UTF-8">
-//       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-//       <title>${design.company_name} - ${design.position}</title>
-      
-//       ${previewImageUrl ? `<link rel="preload" href="${previewImageUrl}" as="image">` : ''}
-      
-//       <style>
-//         * {
-//           margin: 0;
-//           padding: 0;
-//           box-sizing: border-box;
-//         }
-//         body {
-//           background: #f5f5f5;
-//           min-height: 100vh;
-//           display: flex;
-//           flex-direction: column;
-//           overflow-x: hidden;
-//           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-//           -webkit-user-select: none;
-//           -moz-user-select: none;
-//           user-select: none;
-//         }
-//         .header {
-//           background: white;
-//           padding: 24px 40px;
-//           box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-//           position: sticky;
-//           top: 0;
-//           z-index: 100;
-//         }
-//         .header h1 {
-//           color: #1a1a1a;
-//           font-size: 20px;
-//           margin-bottom: 6px;
-//           font-weight: 600;
-//         }
-//         .header p {
-//           color: #666;
-//           font-size: 13px;
-//         }
-//         .badge {
-//           display: inline-block;
-//           padding: 4px 8px;
-//           border-radius: 4px;
-//           font-size: 12px;
-//           font-weight: 600;
-//           text-transform: uppercase;
-//           margin-left: 8px;
-//         }
-//         .badge.pending { background: #FFF4E6; color: #F59E0B; }
-//         .badge.viewed { background: #DBEAFE; color: #2563EB; }
-//         .badge.approved { background: #D1FAE5; color: #059669; }
-//         .badge.rejected { background: #FEE2E2; color: #DC2626; }
-        
-//         .container {
-//           flex: 1;
-//           display: flex;
-//           justify-content: center;
-//           align-items: center;
-//           padding: 20px;
-//           position: relative;
-//         }
-        
-//         .design-wrapper {
-//           width: 100%;
-//           max-width: 1400px;
-//           height: 85vh;
-//           border-radius: 8px;
-//           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-//           background: white;
-//           position: relative;
-//           border: 1px solid #e5e5e5;
-//           overflow: hidden;
-//         }
-        
-//         .preview-container {
-//           width: 100%;
-//           height: 100%;
-//           position: relative;
-//           display: flex;
-//           align-items: center;
-//           justify-content: center;
-//           background: #f9fafb;
-//           cursor: pointer;
-//           transition: transform 0.2s ease;
-//         }
-        
-//         .preview-container:hover {
-//           transform: scale(1.01);
-//         }
-        
-//         .preview-image {
-//           max-width: 100%;
-//           max-height: 100%;
-//           object-fit: contain;
-//           display: block;
-//         }
-        
-//         .preview-overlay {
-//           position: absolute;
-//           top: 0;
-//           left: 0;
-//           right: 0;
-//           bottom: 0;
-//           background: rgba(0, 0, 0, 0.5);
-//           display: flex;
-//           flex-direction: column;
-//           align-items: center;
-//           justify-content: center;
-//           opacity: 0;
-//           transition: opacity 0.3s ease;
-//           color: white;
-//         }
-        
-//         .preview-container:hover .preview-overlay {
-//           opacity: 1;
-//         }
-        
-//         .play-icon {
-//           font-size: 64px;
-//           margin-bottom: 16px;
-//         }
-        
-//         .preview-text {
-//           font-size: 18px;
-//           font-weight: 600;
-//         }
-        
-//         .iframe-container {
-//           width: 100%;
-//           height: 100%;
-//           display: none;
-//           position: relative;
-//         }
-        
-//         .iframe-container.active {
-//           display: block;
-//         }
-        
-//         .design-frame {
-//           width: 100%;
-//           height: 100%;
-//           border: none;
-//         }
-        
-//         .loading-overlay {
-//           position: absolute;
-//           top: 0;
-//           left: 0;
-//           right: 0;
-//           bottom: 0;
-//           background: white;
-//           display: flex;
-//           flex-direction: column;
-//           align-items: center;
-//           justify-content: center;
-//           z-index: 10;
-//         }
-        
-//         .loading-overlay.hidden {
-//           display: none;
-//         }
-        
-//         .spinner {
-//           width: 48px;
-//           height: 48px;
-//           border: 4px solid #f3f3f3;
-//           border-top: 4px solid #1DBC79;
-//           border-radius: 50%;
-//           animation: spin 1s linear infinite;
-//         }
-        
-//         @keyframes spin {
-//           0% { transform: rotate(0deg); }
-//           100% { transform: rotate(360deg); }
-//         }
-        
-//         .loading-text {
-//           margin-top: 16px;
-//           color: #666;
-//           font-size: 14px;
-//         }
-        
-//         .action-buttons {
-//           position: fixed;
-//           bottom: 30px;
-//           right: 30px;
-//           display: flex;
-//           flex-direction: column;
-//           gap: 12px;
-//           z-index: 1000;
-//         }
-        
-//         .btn {
-//           padding: 12px 24px;
-//           border-radius: 6px;
-//           font-size: 14px;
-//           font-weight: 600;
-//           cursor: pointer;
-//           border: none;
-//           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-//           transition: all 0.2s ease;
-//           display: inline-flex;
-//           align-items: center;
-//           gap: 8px;
-//           text-decoration: none;
-//         }
-        
-//         .btn:hover {
-//           transform: translateY(-1px);
-//           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-//         }
-        
-//         .btn-primary {
-//           background: #1DBC79;
-//           color: white;
-//         }
-        
-//         .btn-primary:hover {
-//           background: #18a865;
-//         }
-        
-//         .btn-back {
-//           background: #6B7280;
-//           color: white;
-//           display: none;
-//         }
-        
-//         .btn-back.visible {
-//           display: inline-flex;
-//         }
-        
-//         .btn-back:hover {
-//           background: #4B5563;
-//         }
-        
-//         .copied {
-//           position: fixed;
-//           bottom: 170px;
-//           right: 30px;
-//           background: #1DBC79;
-//           color: white;
-//           padding: 12px 24px;
-//           border-radius: 6px;
-//           font-weight: 600;
-//           opacity: 0;
-//           transition: opacity 0.3s ease;
-//           pointer-events: none;
-//           box-shadow: 0 2px 8px rgba(29, 188, 121, 0.3);
-//           z-index: 1000;
-//         }
-        
-//         .copied.show {
-//           opacity: 1;
-//         }
-        
-//         .watermark {
-//           position: fixed;
-//           bottom: 20px;
-//           left: 20px;
-//           background: rgba(0, 0, 0, 0.7);
-//           padding: 8px 16px;
-//           border-radius: 6px;
-//           font-size: 12px;
-//           color: #fff;
-//           pointer-events: none;
-//           z-index: 999;
-//           display: none;
-//         }
-        
-//         .watermark.visible {
-//           display: block;
-//         }
-        
-//         @media (max-width: 768px) {
-//           .header {
-//             padding: 16px 20px;
-//           }
-//           .header h1 {
-//             font-size: 16px;
-//           }
-//           .action-buttons {
-//             right: 20px;
-//             bottom: 20px;
-//           }
-//           .btn {
-//             padding: 10px 20px;
-//             font-size: 13px;
-//           }
-//         }
-//       </style>
-//     </head>
-//     <body>
-//       <div class="header">
-//         <h1>
-//           ${design.company_name} - ${design.position}
-//           <span class="badge ${design.status}">${design.status}</span>
-//         </h1>
-//         <p>Design Submission • ${design.design_type.toUpperCase()} • Submitted ${new Date(design.created_at).toLocaleDateString()}</p>
+//     // Get default layer preview URL (layer 0) for Figma designs
+//     let defaultLayerUrl = null;
+//     if (design.design_type === 'figma' && layers.length > 0 && layers[0].layer_preview_url) {
+//       defaultLayerUrl = layers[0].layer_preview_url;
+//     }
+
+//     // Serialize layers data for JavaScript
+//     const layersJSON = JSON.stringify(layers);
+
+//     // ===== RENDER HTML =====
+// const html = `
+// <!DOCTYPE html>
+// <html lang="en">
+// <head>
+//   <meta charset="UTF-8">
+//   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//   <title>${design.position} - ${design.company_name}</title>
+  
+//   <style>
+//     * { margin: 0; padding: 0; box-sizing: border-box; }
+//     body { background: #FFFFFF; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111827; }
+
+//     /* Loading Screen */
+//     .loading-screen { position: fixed; inset: 0; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+//     .loading-screen.fade-out { opacity: 0; pointer-events: none; }
+//     .loading-logo { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 24px; letter-spacing: -0.5px; }
+//     .loading-spinner { width: 48px; height: 48px; border: 4px solid #E5E7EB; border-top: 4px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+//     .loading-text { color: #6B7280; font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+//     .loading-subtext { color: #9CA3AF; font-size: 13px; }
+//     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+//     /* Main Content - Hidden initially */
+//     .main-content { opacity: 0; transition: opacity 0.5s ease; }
+//     .main-content.visible { opacity: 1; }
+
+//     /* Navbar */
+//     .navbar { background: #FFFFFF; padding: 20px 32px; border-bottom: 1px solid #E5E7EB; }
+//     .nav-content { max-width: 1400px; margin: 0 auto; }
+//     .nav-title { font-size: 22px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+//     .nav-meta { font-size: 14px; color: #6B7280; }
+
+//     /* Page container */
+//     .page-container { max-width: 1400px; margin: 0 auto; padding: 0 32px 24px 32px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+
+//     /* Content area */
+//     .content-area { background: #F9FAFB; border-radius: 0; padding: 24px 20px 20px 20px; min-height: 600px; position: relative; }
+    
+//     .page-dropdown { width: 220px; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 6px; background: white; font-size: 14px; color: #374151; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+//     .page-dropdown:focus { outline: none; border-color: #3B82F6; }
+//     .page-dropdown:disabled { opacity: 0.5; cursor: not-allowed; }
+
+//     .preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+//     .preview-controls { display: flex; gap: 8px; align-items: center; }
+    
+//     .expand-btn { width: 36px; height: 36px; border-radius: 6px; border: 1px solid #E5E7EB; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+//     .expand-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
+    
+//     .preview-area { background: #FFFFFF; border-radius: 8px; overflow: hidden; min-height: 600px; position: relative; display: flex; align-items: center; justify-content: center; }
+    
+//     /* Screenshot View */
+//     .screenshot-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+//     .preview-image { width: 100%; height: 100%; object-fit: contain; display: block; max-height: 700px; transition: opacity 0.3s ease; }
+//     .preview-image.loading { opacity: 0; }
+    
+//     /* Layer loading overlay */
+//     .layer-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: none; align-items: center; justify-content: center; z-index: 5; }
+//     .layer-loading-overlay.show { display: flex; }
+//     .mini-spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    
+//     /* PDF Iframe View */
+//     .iframe-container { width: 100%; height: 100%; position: relative; }
+//     .design-frame { width: 100%; height: 650px; border: none; display: block; }
+
+//     .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+//     .loading-overlay.hidden { display: none; }
+//     .spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+//     .loading-text-small { margin-top: 12px; color: #6B7280; font-size: 14px; font-weight: 500; }
+
+//     /* Info panels */
+//     .info-column { display: flex; flex-direction: column; gap: 16px; padding-top: 24px; }
+//     .info-panel.usage-terms { background: #FFFFFF; border-radius: 8px; overflow: hidden; border: 1px solid #FDE68A; }
+//     .info-panel.usage-terms h3 { font-size: 16px; font-weight: 600; color: #92400E; background: #FFFBEB; padding: 14px 16px; margin: 0; border-bottom: 1px solid #FDE68A; }
+//     .info-panel.usage-terms ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
+//     .info-panel.usage-terms li { margin-bottom: 6px; }
+    
+//     .info-panel.documentation { background: #FFFFFF; border-radius: 8px; overflow: hidden; border: 1px solid #BFDBFE; }
+//     .info-panel.documentation h3 { font-size: 16px; font-weight: 600; color: #1E40AF; background: #EFF6FF; padding: 14px 16px; margin: 0; border-bottom: 1px solid #BFDBFE; }
+//     .info-panel.documentation ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
+//     .info-panel.documentation li { margin-bottom: 6px; }
+
+//     /* Responsive */
+//     @media (max-width: 1100px) {
+//       .page-container { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+//       .design-frame { height: 500px; }
+//       .info-column { flex-direction: row; gap: 16px; }
+//       .info-panel { flex: 1; }
+//     }
+
+//     @media (max-width: 768px) {
+//       .page-container { padding: 16px; }
+//       .navbar { padding: 16px 20px; }
+//       .nav-title { font-size: 18px; }
+//       .nav-meta { font-size: 13px; }
+//       .preview-header { flex-direction: column; align-items: flex-start; }
+//       .preview-controls { width: 100%; justify-content: flex-end; }
+//       .info-column { flex-direction: column; }
+//       .design-frame { height: 450px; }
+//       .loading-logo { font-size: 24px; }
+//     }
+//   </style>
+// </head>
+// <body>
+//   <!-- Loading Screen -->
+//   <div class="loading-screen" id="loadingScreen">
+//     <div class="loading-logo">The BYND</div>
+//     <div class="loading-spinner"></div>
+//     <div class="loading-text">Loading design submission...</div>
+//     <div class="loading-subtext">Preparing ${layers.length > 0 ? layers.length + ' pages' : 'your preview'}</div>
+//   </div>
+
+//   <!-- Main Content -->
+//   <div class="main-content" id="mainContent">
+//     <div class="navbar">
+//       <div class="nav-content">
+//         <div class="nav-title">${design.position}</div>
+//         <div class="nav-meta">${design.company_name} • Submitted on ${new Date(design.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</div>
 //       </div>
-      
-//       <div class="container">
-//         <div class="design-wrapper">
-//           <div class="preview-container" id="previewContainer" onclick="loadFullView()">
-//             ${previewImageUrl ? `
-//               <img src="${previewImageUrl}" alt="Design Preview" class="preview-image">
-//               <div class="preview-overlay">
-//                 <div class="play-icon">▶</div>
-//                 <div class="preview-text">Click to view full design</div>
-//               </div>
-//             ` : `
-//               <div class="preview-overlay" style="opacity: 1; background: rgba(0,0,0,0.1);">
-//                 <div class="preview-text" style="color: #666;">Click to load design</div>
-//               </div>
-//             `}
-//           </div>
+//     </div>
+
+//     <div class="page-container">
+//       <div class="content-area">
+//         <div class="preview-header">
+//           ${design.design_type === 'figma' && layers.length > 0 ? `
+//           <select class="page-dropdown" id="pageSelect" onchange="switchPage(this.value)">
+//             ${layers.map((layer, idx) => `<option value="${idx}" ${idx === 0 ? 'selected' : ''}>Page: ${layer.layer_name}</option>`).join('')}
+//           </select>
+//           ` : '<div></div>'}
           
+//           <div class="preview-controls">
+//             <button class="expand-btn" onclick="toggleFullscreen()" title="Expand to fullscreen">
+//               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+//                 <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+//               </svg>
+//             </button>
+//           </div>
+//         </div>
+
+//         <div class="preview-area" id="previewArea">
+//           ${design.design_type === 'figma' ? `
+//           <!-- FIGMA: Screenshot preview (default to layer 0) -->
+//           <div class="screenshot-container" id="screenshotContainer">
+//             <div class="layer-loading-overlay" id="layerLoadingOverlay">
+//               <div class="mini-spinner"></div>
+//             </div>
+//             ${defaultLayerUrl ? `<img src="${defaultLayerUrl}" alt="Design Preview" class="preview-image loading" id="previewImage">` : `<div style="color:#9CA3AF;font-size:14px;">Loading preview...</div>`}
+//           </div>
+//           ` : `
+//           <!-- PDF: Iframe view -->
 //           <div class="iframe-container" id="iframeContainer">
 //             <div class="loading-overlay" id="loadingOverlay">
 //               <div class="spinner"></div>
-//               <div class="loading-text">Loading full design...</div>
+//               <div class="loading-text-small">Loading PDF...</div>
 //             </div>
-//             <iframe 
-//               id="designFrame"
-//               class="design-frame"
-//               data-src="${fullViewUrl}"
-//             ></iframe>
+//             <iframe id="designFrame" class="design-frame" src="${fullViewUrl}"></iframe>
 //           </div>
+//           `}
 //         </div>
 //       </div>
 
-//       <div class="action-buttons">
-//         <button class="btn btn-back" id="backBtn" onclick="showPreview()">
-//           ← Back to Preview
-//         </button>
-        
-//         <button class="btn btn-primary" onclick="copyLink()">
-//           Copy Link
-//         </button>
-//       </div>
+//       <div class="info-column">
+//         <div class="info-panel usage-terms">
+//           <h3>Usage Terms</h3>
+//           <ul>
+//             <li>This design is shared for evaluation purposes only.</li>
+//             <li>The content is the intellectual property of the applicant.</li>
+//             <li>Redistribution, duplication, or reuse is discouraged and may be subject to follow-up.</li>
+//           </ul>
+//         </div>
 
-//       <div class="copied" id="copiedMsg">
-//         ✓ Link copied!
+//         <div class="info-panel documentation">
+//           <h3>Documentation Notice</h3>
+//           <ul>
+//             <li>This submission is documented by The BYND with activity logs, timestamps, and owner details.</li>
+//             <li>Viewing this assignment logs your access and supports a fair review process.</li>
+//             <li>The BYND helps ensure the designer receives credit for their work through transparent documentation.</li>
+//           </ul>
+//         </div>
 //       </div>
+//     </div>
+//   </div>
 
-//       <div class="watermark" id="watermark">
-//         Powered by BYND
-//       </div>
+//   <script>
+//     const layers = ${layersJSON};
+//     const designType = '${design.design_type}';
+//     const loadingDuration = ${loadingDuration};
+//     let currentLayerIndex = 0;
+//     let isLayerSwitching = false;
+//     const preloadedImages = new Map(); // Cache for preloaded images
 
-//       <script>
-//         let isFullViewLoaded = false;
-//         const isPDF = ${isPDF};
-        
-//         const previewContainer = document.getElementById('previewContainer');
-//         const iframeContainer = document.getElementById('iframeContainer');
-//         const designFrame = document.getElementById('designFrame');
-//         const loadingOverlay = document.getElementById('loadingOverlay');
-//         const backBtn = document.getElementById('backBtn');
-//         const watermark = document.getElementById('watermark');
-        
-//         // Disable right-click
-//         document.addEventListener('contextmenu', (e) => {
-//           e.preventDefault();
-//           return false;
-//         });
-        
-//         // Disable keyboard shortcuts for save/print
-//         document.addEventListener('keydown', (e) => {
-//           // Prevent Ctrl+S, Ctrl+P (Windows/Linux) and Cmd+S, Cmd+P (Mac)
-//           if (
-//             (e.ctrlKey && (e.key === 's' || e.key === 'p')) ||
-//             (e.metaKey && (e.key === 's' || e.key === 'p'))
-//           ) {
-//             e.preventDefault();
-//             return false;
-//           }
-//         });
-        
-//         function loadFullView() {
-//           previewContainer.style.display = 'none';
-//           iframeContainer.classList.add('active');
-//           backBtn.classList.add('visible');
-          
-//           if (isPDF) {
-//             watermark.classList.add('visible');
-//           }
-          
-//           if (!isFullViewLoaded) {
-//             const src = designFrame.getAttribute('data-src');
-//             designFrame.src = src;
-//             isFullViewLoaded = true;
-            
-//             setTimeout(() => {
-//               loadingOverlay.classList.add('hidden');
-//             }, 3000);
-            
-//             designFrame.onload = function() {
-//               loadingOverlay.classList.add('hidden');
-//             };
-//           } else {
-//             loadingOverlay.classList.add('hidden');
-//           }
+//     const loadingScreen = document.getElementById('loadingScreen');
+//     const mainContent = document.getElementById('mainContent');
+//     const previewArea = document.getElementById('previewArea');
+//     const screenshotContainer = document.getElementById('screenshotContainer');
+//     const previewImage = document.getElementById('previewImage');
+//     const layerLoadingOverlay = document.getElementById('layerLoadingOverlay');
+//     const iframeContainer = document.getElementById('iframeContainer');
+//     const designFrame = document.getElementById('designFrame');
+//     const loadingOverlay = document.getElementById('loadingOverlay');
+//     const pageSelect = document.getElementById('pageSelect');
+
+//     // Preload all layer images on page load for smooth switching
+//     function preloadAllLayers() {
+//       if (designType !== 'figma' || layers.length === 0) return;
+      
+//       console.log('🔄 Preloading all layers...');
+      
+//       layers.forEach((layer, idx) => {
+//         if (layer.layer_preview_url) {
+//           const img = new Image();
+//           img.onload = () => {
+//             preloadedImages.set(idx, img);
+//             console.log(\`✅ Preloaded layer \${idx}: \${layer.layer_name}\`);
+//           };
+//           img.onerror = () => {
+//             console.error(\`❌ Failed to preload layer \${idx}: \${layer.layer_name}\`);
+//           };
+//           img.src = layer.layer_preview_url;
 //         }
+//       });
+//     }
+
+//     // Hide loading screen and show content after specified duration
+//     setTimeout(() => {
+//       loadingScreen.classList.add('fade-out');
+//       mainContent.classList.add('visible');
+      
+//       // Remove loading screen from DOM after fade out
+//       setTimeout(() => {
+//         loadingScreen.style.display = 'none';
+//       }, 500);
+
+//       // Start preloading all layers after main content is visible
+//       if (designType === 'figma') {
+//         preloadAllLayers();
         
-//         function showPreview() {
-//           previewContainer.style.display = 'flex';
-//           iframeContainer.classList.remove('active');
-//           backBtn.classList.remove('visible');
-//           watermark.classList.remove('visible');
+//         // Make sure first image is visible
+//         if (previewImage) {
+//           previewImage.onload = () => {
+//             previewImage.classList.remove('loading');
+//           };
+//           // Fallback in case onload doesn't fire
+//           setTimeout(() => {
+//             if (previewImage.classList.contains('loading')) {
+//               previewImage.classList.remove('loading');
+//             }
+//           }, 1000);
 //         }
+//       }
+//     }, loadingDuration);
+
+//     // For PDF: Hide loading overlay after iframe loads
+//     if (designType === 'pdf' && designFrame && loadingOverlay) {
+//       designFrame.onload = () => {
+//         loadingOverlay.classList.add('hidden');
+//       };
+//       setTimeout(() => {
+//         loadingOverlay.classList.add('hidden');
+//       }, 3000);
+//     }
+
+//     // For Figma: Layer switching with proper preloading
+//     function switchLayer(layerIndex) {
+//       if (isLayerSwitching || layerIndex === currentLayerIndex || layers.length === 0) return;
+      
+//       const layer = layers[layerIndex];
+//       if (!layer || !layer.layer_preview_url || !previewImage) return;
+
+//       isLayerSwitching = true;
+
+//       // Disable dropdown during switch
+//       if (pageSelect) pageSelect.disabled = true;
+
+//       // Show loading overlay
+//       if (layerLoadingOverlay) {
+//         layerLoadingOverlay.classList.add('show');
+//       }
+
+//       // Hide current image
+//       previewImage.classList.add('loading');
+
+//       // Check if image is already preloaded
+//       if (preloadedImages.has(layerIndex)) {
+//         // Use cached image
+//         const cachedImg = preloadedImages.get(layerIndex);
+//         previewImage.src = cachedImg.src;
         
-//         function copyLink() {
-//           const link = window.location.href;
-//           navigator.clipboard.writeText(link).then(() => {
-//             const msg = document.getElementById('copiedMsg');
-//             msg.classList.add('show');
+//         // Give browser time to render
+//         setTimeout(() => {
+//           previewImage.classList.remove('loading');
+//           if (layerLoadingOverlay) {
+//             layerLoadingOverlay.classList.remove('show');
+//           }
+//           if (pageSelect) pageSelect.disabled = false;
+//           isLayerSwitching = false;
+//           currentLayerIndex = layerIndex;
+//           console.log(\`✅ Switched to layer \${layerIndex} (from cache)\`);
+//         }, 100);
+//       } else {
+//         // Load image if not cached
+//         const img = new Image();
+        
+//         img.onload = () => {
+//           previewImage.src = img.src;
+//           preloadedImages.set(layerIndex, img);
+          
+//           // Wait for browser to render the image
+//           requestAnimationFrame(() => {
 //             setTimeout(() => {
-//               msg.classList.remove('show');
-//             }, 2000);
-//           }).catch(err => {
-//             console.error('Failed to copy:', err);
-//             alert('Failed to copy link');
+//               previewImage.classList.remove('loading');
+//               if (layerLoadingOverlay) {
+//                 layerLoadingOverlay.classList.remove('show');
+//               }
+//               if (pageSelect) pageSelect.disabled = false;
+//               isLayerSwitching = false;
+//               currentLayerIndex = layerIndex;
+//               console.log(\`✅ Switched to layer \${layerIndex} (loaded)\`);
+//             }, 100);
 //           });
+//         };
+
+//         img.onerror = () => {
+//           console.error(\`❌ Failed to load layer \${layerIndex}: \${layer.layer_name}\`);
+//           previewImage.classList.remove('loading');
+//           if (layerLoadingOverlay) {
+//             layerLoadingOverlay.classList.remove('show');
+//           }
+//           if (pageSelect) pageSelect.disabled = false;
+//           isLayerSwitching = false;
+          
+//           // Show error message
+//           alert(\`Failed to load page: \${layer.layer_name}. Please try again.\`);
+//         };
+
+//         img.src = layer.layer_preview_url;
+//       }
+//     }
+
+//     function switchPage(value) {
+//       const idx = Number(value);
+//       if (!isNaN(idx) && idx >= 0 && idx < layers.length) {
+//         switchLayer(idx);
+//       }
+//     }
+
+//     function toggleFullscreen() {
+//       if (!document.fullscreenElement) {
+//         previewArea.requestFullscreen().catch(err => console.error('Fullscreen error:', err));
+//       } else {
+//         document.exitFullscreen();
+//       }
+//     }
+
+//     // Initialize: Make sure layer 0 is selected on load
+//     if (designType === 'figma' && layers.length > 0 && pageSelect) {
+//       pageSelect.value = '0';
+//       currentLayerIndex = 0;
+//     }
+
+//     // Prevent page select changes while switching
+//     if (pageSelect) {
+//       pageSelect.addEventListener('mousedown', (e) => {
+//         if (isLayerSwitching) {
+//           e.preventDefault();
 //         }
-//       </script>
-//     </body>
-//     </html>
-//     `;
+//       });
+//     }
+//   </script>
+// </body>
+// </html>
+// `;
 
 //     res.send(html);
 
@@ -1528,6 +521,8 @@
 // });
 
 // export default router;
+
+
 import express from "express";
 import { supabase_connect } from "../supabase/set-up.js";
 import cookieParser from "cookie-parser";
@@ -1535,7 +530,7 @@ import cookieParser from "cookie-parser";
 const router = express.Router();
 router.use(cookieParser());
 
-// Get preview by unique ID
+// Get preview by unique ID with layers
 router.get('/:uniqueId', async (req, res) => {
   try {
     const { uniqueId } = req.params;
@@ -1563,445 +558,497 @@ router.get('/:uniqueId', async (req, res) => {
       return res.status(404).json({ error: "Design not found" });
     }
 
+    // Fetch layers if Figma design (ordered by layer_order)
+    let layers = [];
+    if (design.design_type === 'figma') {
+      const { data: layersData, error: layersError } = await supabase_connect
+        .from("design_layers")
+        .select("*")
+        .eq('submission_id', design.id)
+        .order('layer_order', { ascending: true });
+
+      if (!layersError && layersData) {
+        // For each layer, fetch the preview image from storage
+        // Path structure: userId/submissionId/layerName_layerOrder.png
+        for (let layer of layersData) {
+          const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
+          const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
+          
+          // Try to get signed URL for this layer
+          const { data: signedData, error: signedError } = await supabase_connect.storage
+            .from('design_previews')
+            .createSignedUrl(imagePath, 3600);
+          
+          if (!signedError && signedData) {
+            layer.layer_preview_url = signedData.signedUrl;
+          } else {
+            console.log(`⚠️ Could not fetch preview for layer: ${imagePath}`);
+            layer.layer_preview_url = null;
+          }
+        }
+        
+        layers = layersData;
+      }
+    }
+
+    // Calculate loading time based on layers count
+    const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
+
     // ===== VIEW TRACKING LOGIC =====
     const viewCookieName = `viewed_${uniqueId}`;
     const hasViewedBefore = req.cookies[viewCookieName];
 
     if (!hasViewedBefore) {
-      // First time viewing this design - track it!
       const currentViews = design.total_views || 0;
-      
-      // IMPORTANT: Change status from 'pending' to 'viewed' on first view
       const newStatus = design.status === 'pending' ? 'viewed' : design.status;
 
-      // Update view count, timestamp, and status
       const { error: updateError } = await supabase_connect
         .from("design_submissions")
         .update({ 
           total_views: currentViews + 1,
           last_viewed_at: new Date().toISOString(),
-          status: newStatus // Update status to 'viewed'
+          status: newStatus
         })
         .eq('id', design.id);
 
       if (updateError) {
         console.error("View update error:", updateError);
       } else {
-        console.log(`✅ View tracked for ${uniqueId}. Status: ${design.status} → ${newStatus}, Views: ${currentViews} → ${currentViews + 1}`);
+        console.log(`📊 View tracked for ${uniqueId}. Status: ${design.status} → ${newStatus}, Views: ${currentViews} → ${currentViews + 1}`);
       }
 
-      // Set cookie to expire in 24 hours
       res.cookie(viewCookieName, 'true', {
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true
       });
 
     } else {
-      console.log(` Duplicate view prevented for ${uniqueId} (cookie exists)`);
+      console.log(`🔄 Duplicate view prevented for ${uniqueId} (cookie exists)`);
     }
 
-    // Determine URLs
-    let previewImageUrl = design.preview_thumbnail;
-    let fullViewUrl = design.embed_url;
- if (design.design_type === 'pdf') {
-  // Use signed URL for private buckets (valid for 1 hour)
-  const { data, error: signedUrlError } = await supabase_connect.storage
-    .from('design_files')
-    .createSignedUrl(design.pdf_file_path, 3600); // 3600 seconds = 1 hour
-  
-  if (signedUrlError) {
-    console.error("Signed URL error:", signedUrlError);
-    return res.status(500).json({ error: "Failed to generate PDF URL" });
-  }
-  
-  fullViewUrl = data.signedUrl;
-}
+    // Generate signed URL for main preview thumbnail (used for PDF or default)
+    let previewImageUrl = null;
+    if (design.preview_thumbnail) {
+      const { data: signedData, error: signedError } = await supabase_connect.storage
+        .from('design_previews')
+        .createSignedUrl(design.preview_thumbnail, 3600);
+      
+      if (!signedError && signedData) {
+        previewImageUrl = signedData.signedUrl;
+      }
+    }
 
-    // Return HTML (same as before)
-    const html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${design.company_name} - ${design.position}</title>
+    // Determine full view URL for PDF
+    let fullViewUrl = null;
+    if (design.design_type === 'pdf') {
+      const { data, error: signedUrlError } = await supabase_connect.storage
+        .from('design_files')
+        .createSignedUrl(design.pdf_file_path, 3600);
       
-      ${previewImageUrl ? `<link rel="preload" href="${previewImageUrl}" as="image">` : ''}
+      if (signedUrlError) {
+        console.error("Signed URL error:", signedUrlError);
+        return res.status(500).json({ error: "Failed to generate PDF URL" });
+      }
       
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        body {
-          background: #f5f5f5;
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          overflow-x: hidden;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-        .header {
-          background: white;
-          padding: 24px 40px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-          position: sticky;
-          top: 0;
-          z-index: 100;
-        }
-        .header h1 {
-          color: #1a1a1a;
-          font-size: 20px;
-          margin-bottom: 6px;
-          font-weight: 600;
-        }
-        .header p {
-          color: #666;
-          font-size: 13px;
-        }
-        .badge {
-          display: inline-block;
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          margin-left: 8px;
-        }
-        .badge.pending { background: #FFF4E6; color: #F59E0B; }
-        .badge.viewed { background: #DBEAFE; color: #2563EB; }
-        .badge.approved { background: #D1FAE5; color: #059669; }
-        .badge.rejected { background: #FEE2E2; color: #DC2626; }
-        
-        .container {
-          flex: 1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 20px;
-          position: relative;
-        }
-        
-        .design-wrapper {
-          width: 100%;
-          max-width: 1400px;
-          height: 85vh;
-          border-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          background: white;
-          position: relative;
-          border: 1px solid #e5e5e5;
-          overflow: hidden;
-        }
-        
-        .preview-container {
-          width: 100%;
-          height: 100%;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f9fafb;
-          cursor: pointer;
-          transition: transform 0.2s ease;
-        }
-        
-        .preview-container:hover {
-          transform: scale(1.01);
-        }
-        
-        .preview-image {
-          max-width: 100%;
-          max-height: 100%;
-          object-fit: contain;
-          display: block;
-        }
-        
-        .preview-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          opacity: 0;
-          transition: opacity 0.3s ease;
-          color: white;
-        }
-        
-        .preview-container:hover .preview-overlay {
-          opacity: 1;
-        }
-        
-        .play-icon {
-          font-size: 64px;
-          margin-bottom: 16px;
-        }
-        
-        .preview-text {
-          font-size: 18px;
-          font-weight: 600;
-        }
-        
-        .iframe-container {
-          width: 100%;
-          height: 100%;
-          display: none;
-          position: relative;
-        }
-        
-        .iframe-container.active {
-          display: block;
-        }
-        
-        .design-frame {
-          width: 100%;
-          height: 100%;
-          border: none;
-        }
-        
-        .loading-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: white;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          z-index: 10;
-        }
-        
-        .loading-overlay.hidden {
-          display: none;
-        }
-        
-        .spinner {
-          width: 48px;
-          height: 48px;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #1DBC79;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        
-        .loading-text {
-          margin-top: 16px;
-          color: #666;
-          font-size: 14px;
-        }
-        
-        .action-buttons {
-          position: fixed;
-          bottom: 30px;
-          right: 30px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          z-index: 1000;
-        }
-        
-        .btn {
-          padding: 12px 24px;
-          border-radius: 6px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          border: none;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-          transition: all 0.2s ease;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          text-decoration: none;
-        }
-        
-        .btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        .btn-primary {
-          background: #1DBC79;
-          color: white;
-        }
-        
-        .btn-primary:hover {
-          background: #18a865;
-        }
-        
-        .btn-back {
-          background: #6B7280;
-          color: white;
-          display: none;
-        }
-        
-        .btn-back.visible {
-          display: inline-flex;
-        }
-        
-        .btn-back:hover {
-          background: #4B5563;
-        }
-        
-        .copied {
-          position: fixed;
-          bottom: 170px;
-          right: 30px;
-          background: #1DBC79;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 6px;
-          font-weight: 600;
-          opacity: 0;
-          transition: opacity 0.3s ease;
-          pointer-events: none;
-          box-shadow: 0 2px 8px rgba(29, 188, 121, 0.3);
-          z-index: 1000;
-        }
-        
-        .copied.show {
-          opacity: 1;
-        }
-        
-        @media (max-width: 768px) {
-          .header {
-            padding: 16px 20px;
-          }
-          .header h1 {
-            font-size: 16px;
-          }
-          .action-buttons {
-            right: 20px;
-            bottom: 20px;
-          }
-          .btn {
-            padding: 10px 20px;
-            font-size: 13px;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>
-          ${design.company_name} - ${design.position}
-          <span class="badge ${design.status}">${design.status}</span>
-        </h1>
-        <p>Design Submission • ${design.design_type.toUpperCase()} • Submitted ${new Date(design.created_at).toLocaleDateString()}</p>
+      fullViewUrl = data.signedUrl;
+    }
+
+    // Get default layer preview URL (layer 0) for Figma designs
+    let defaultLayerUrl = null;
+    if (design.design_type === 'figma' && layers.length > 0 && layers[0].layer_preview_url) {
+      defaultLayerUrl = layers[0].layer_preview_url;
+    }
+
+    // Serialize layers data for JavaScript
+    const layersJSON = JSON.stringify(layers);
+
+    // ===== RENDER HTML =====
+const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${design.position} - ${design.company_name}</title>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #FFFFFF; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111827; }
+
+    /* Loading Screen */
+    .loading-screen { position: fixed; inset: 0; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+    .loading-screen.fade-out { opacity: 0; pointer-events: none; }
+    .loading-logo { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 24px; letter-spacing: -0.5px; }
+    .loading-spinner { width: 48px; height: 48px; border: 4px solid #E5E7EB; border-top: 4px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+    .loading-text { color: #6B7280; font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+    .loading-subtext { color: #9CA3AF; font-size: 13px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Main Content - Hidden initially */
+    .main-content { opacity: 0; transition: opacity 0.5s ease; }
+    .main-content.visible { opacity: 1; }
+
+    /* Navbar */
+    .navbar { background: #FFFFFF; padding: 20px 32px; border-bottom: 1px solid #E5E7EB; }
+    .nav-content { max-width: 1400px; margin: 0 auto; }
+    .nav-title { font-size: 22px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+    .nav-meta { font-size: 14px; color: #6B7280; }
+
+    /* Page container */
+    .page-container { max-width: 1400px; margin: 0 auto; padding: 0 32px 24px 32px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+
+    /* Content area */
+    .content-area { background: #F9FAFB; border-radius: 0; padding: 24px 20px 20px 20px; min-height: 600px; position: relative; }
+    
+    // .page-dropdown { width: 240px; padding: 12px 14px; border: 1px solid #E5E7EB; border-radius: 10px; background: white; font-size: 14px; font-weight: 500; color: #333333; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23999999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: all 0.2s ease; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    // .page-dropdown:hover { border-color: #D1D5DB; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    // .page-dropdown:focus { outline: none; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    // .page-dropdown:disabled { opacity: 0.5; cursor: not-allowed; }
+    // .page-dropdown option { padding: 10px 14px; font-weight: 400; color: #333333; background: white; }
+    // .page-dropdown option:hover { background: #F5F5F5; }
+    // .page-dropdown option:checked { background: #F0F4FF; color: #3B82F6; font-weight: 500; }
+  .page-dropdown { width: 240px; padding: 10px 12px; border: 1px solid #E5E7EB; border-radius: 8px; background: white; font-size: 14px; font-weight: 500; color: #333333; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23999999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); transition: all 0.2s ease; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .page-dropdown:hover { border-color: #D1D5DB; box-shadow: 0 4px 12px rgba(0,0,0,0.12); background: #FAFAFA; }
+    .page-dropdown:focus { outline: none; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    .page-dropdown:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    /* Dropdown list styling (the expanded menu) */
+    select.page-dropdown:focus { border-radius: 8px 8px 0 0; }
+    select.page-dropdown option:first-child { border-radius: 8px 8px 0 0; }
+    select.page-dropdown option:last-child { border-radius: 0 0 8px 8px; }
+    .page-dropdown option { padding: 10px 12px; font-weight: 400; color: #333333; background: white; border-radius: 6px; }
+    .page-dropdown option:hover { background: #F5F5F5; }
+    .page-dropdown option:checked { background: #F0F4FF; color: #3B82F6; font-weight: 500; }
+
+    .preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+    .preview-controls { display: flex; gap: 8px; align-items: center; }
+    
+    .expand-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid #E5E7EB; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+    .expand-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
+    
+    .preview-area { background: #FFFFFF; border-radius: 20px; overflow: hidden; min-height: 600px; position: relative; display: flex; align-items: center; justify-content: center; }
+    
+    /* Screenshot View */
+    .screenshot-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+    .preview-image { width: 100%; height: 100%; object-fit: contain; display: block; max-height: 700px; transition: opacity 0.3s ease; }
+    .preview-image.loading { opacity: 0; }
+    
+    /* Layer loading overlay */
+    .layer-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: none; align-items: center; justify-content: center; z-index: 5; }
+    .layer-loading-overlay.show { display: flex; }
+    .mini-spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    
+    /* PDF Iframe View */
+    .iframe-container { width: 100%; height: 100%; position: relative; }
+    .design-frame { width: 100%; height: 650px; border: none; display: block; }
+
+    .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+    .loading-overlay.hidden { display: none; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .loading-text-small { margin-top: 12px; color: #6B7280; font-size: 14px; font-weight: 500; }
+
+    /* Info panels */
+    .info-column { display: flex; flex-direction: column; gap: 16px; padding-top: 24px; }
+    .info-panel.usage-terms { background: #FFFFFF; border-radius: 10px; overflow: hidden; border: 1px solid #FDE68A; }
+    .info-panel.usage-terms h3 { font-size: 16px; font-weight: 600; color: #92400E; background: #FFFBEB; padding: 14px 16px; margin: 0; border-bottom: 1px solid #FDE68A; }
+    .info-panel.usage-terms ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
+    .info-panel.usage-terms li { margin-bottom: 6px; }
+    
+    .info-panel.documentation { background: #FFFFFF; border-radius: 10px; overflow: hidden; border: 1px solid #BFDBFE; }
+    .info-panel.documentation h3 { font-size: 16px; font-weight: 600; color: #1E40AF; background: #EFF6FF; padding: 14px 16px; margin: 0; border-bottom: 1px solid #BFDBFE; }
+    .info-panel.documentation ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
+    .info-panel.documentation li { margin-bottom: 6px; }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .page-container { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+      .design-frame { height: 500px; }
+      .info-column { flex-direction: row; gap: 16px; }
+      .info-panel { flex: 1; }
+    }
+
+    @media (max-width: 768px) {
+      .page-container { padding: 16px; }
+      .navbar { padding: 16px 20px; }
+      .nav-title { font-size: 18px; }
+      .nav-meta { font-size: 13px; }
+      .preview-header { flex-direction: column; align-items: flex-start; }
+      .preview-controls { width: 100%; justify-content: flex-end; }
+      .info-column { flex-direction: column; }
+      .design-frame { height: 450px; }
+      .loading-logo { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-logo">The BYND</div>
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading design submission...</div>
+    <div class="loading-subtext">Preparing ${layers.length > 0 ? layers.length + ' pages' : 'your preview'}</div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content" id="mainContent">
+    <div class="navbar">
+      <div class="nav-content">
+        <div class="nav-title">${design.position}</div>
+        <div class="nav-meta">${design.company_name} • Submitted on ${new Date(design.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</div>
       </div>
-      
-      <div class="container">
-        <div class="design-wrapper">
-          <div class="preview-container" id="previewContainer" onclick="loadFullView()">
-            ${previewImageUrl ? `
-              <img src="${previewImageUrl}" alt="Design Preview" class="preview-image">
-              <div class="preview-overlay">
-                <div class="play-icon">▶</div>
-                <div class="preview-text">Click to view full design</div>
-              </div>
-            ` : `
-              <div class="preview-overlay" style="opacity: 1; background: rgba(0,0,0,0.1);">
-                <div class="preview-text" style="color: #666;">Click to load design</div>
-              </div>
-            `}
-          </div>
+    </div>
+
+    <div class="page-container">
+      <div class="content-area">
+        <div class="preview-header">
+          ${design.design_type === 'figma' && layers.length > 0 ? `
+          <select class="page-dropdown" id="pageSelect" onchange="switchPage(this.value)">
+            ${layers.map((layer, idx) => `<option value="${idx}" ${idx === 0 ? 'selected' : ''}>Page: ${layer.layer_name}</option>`).join('')}
+          </select>
+          ` : '<div></div>'}
           
+          <div class="preview-controls">
+            <button class="expand-btn" onclick="toggleFullscreen()" title="Expand to fullscreen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="preview-area" id="previewArea">
+          ${design.design_type === 'figma' ? `
+          <!-- FIGMA: Screenshot preview (default to layer 0) -->
+          <div class="screenshot-container" id="screenshotContainer">
+            <div class="layer-loading-overlay" id="layerLoadingOverlay">
+              <div class="mini-spinner"></div>
+            </div>
+            ${defaultLayerUrl ? `<img src="${defaultLayerUrl}" alt="Design Preview" class="preview-image loading" id="previewImage">` : `<div style="color:#9CA3AF;font-size:14px;">Loading preview...</div>`}
+          </div>
+          ` : `
+          <!-- PDF: Iframe view -->
           <div class="iframe-container" id="iframeContainer">
             <div class="loading-overlay" id="loadingOverlay">
               <div class="spinner"></div>
-              <div class="loading-text">Loading full design...</div>
+              <div class="loading-text-small">Loading PDF...</div>
             </div>
-            <iframe 
-              id="designFrame"
-              class="design-frame"
-              data-src="${fullViewUrl}"
-              ${design.design_type === 'figma' ? 'sandbox="allow-same-origin allow-scripts allow-popups"' : ''}
-            ></iframe>
+            <iframe id="designFrame" class="design-frame" src="${fullViewUrl}"></iframe>
           </div>
+          `}
         </div>
       </div>
 
-      <div class="action-buttons">
-        <button class="btn btn-back" id="backBtn" onclick="showPreview()">
-          ← Back to Preview
-        </button>
-        
-        <button class="btn btn-primary" onclick="copyLink()">
-          Copy Link
-        </button>
-      </div>
+      <div class="info-column">
+        <div class="info-panel usage-terms">
+          <h3>Usage Terms</h3>
+          <ul>
+            <li>This design is shared for evaluation purposes only.</li>
+            <li>The content is the intellectual property of the applicant.</li>
+            <li>Redistribution, duplication, or reuse is discouraged and may be subject to follow-up.</li>
+          </ul>
+        </div>
 
-      <div class="copied" id="copiedMsg">
-        ✓ Link copied!
+        <div class="info-panel documentation">
+          <h3>Documentation Notice</h3>
+          <ul>
+            <li>This submission is documented by The BYND with activity logs, timestamps, and owner details.</li>
+            <li>Viewing this assignment logs your access and supports a fair review process.</li>
+            <li>The BYND helps ensure the designer receives credit for their work through transparent documentation.</li>
+          </ul>
+        </div>
       </div>
+    </div>
+  </div>
 
-      <script>
-        let isFullViewLoaded = false;
+  <script>
+    const layers = ${layersJSON};
+    const designType = '${design.design_type}';
+    const loadingDuration = ${loadingDuration};
+    let currentLayerIndex = 0;
+    let isLayerSwitching = false;
+    const preloadedImages = new Map(); // Cache for preloaded images
+
+    const loadingScreen = document.getElementById('loadingScreen');
+    const mainContent = document.getElementById('mainContent');
+    const previewArea = document.getElementById('previewArea');
+    const screenshotContainer = document.getElementById('screenshotContainer');
+    const previewImage = document.getElementById('previewImage');
+    const layerLoadingOverlay = document.getElementById('layerLoadingOverlay');
+    const iframeContainer = document.getElementById('iframeContainer');
+    const designFrame = document.getElementById('designFrame');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const pageSelect = document.getElementById('pageSelect');
+
+    // Preload all layer images on page load for smooth switching
+    function preloadAllLayers() {
+      if (designType !== 'figma' || layers.length === 0) return;
+      
+      console.log('🔄 Preloading all layers...');
+      
+      layers.forEach((layer, idx) => {
+        if (layer.layer_preview_url) {
+          const img = new Image();
+          img.onload = () => {
+            preloadedImages.set(idx, img);
+            console.log(\`✅ Preloaded layer \${idx}: \${layer.layer_name}\`);
+          };
+          img.onerror = () => {
+            console.error(\`❌ Failed to preload layer \${idx}: \${layer.layer_name}\`);
+          };
+          img.src = layer.layer_preview_url;
+        }
+      });
+    }
+
+    // Hide loading screen and show content after specified duration
+    setTimeout(() => {
+      loadingScreen.classList.add('fade-out');
+      mainContent.classList.add('visible');
+      
+      // Remove loading screen from DOM after fade out
+      setTimeout(() => {
+        loadingScreen.style.display = 'none';
+      }, 500);
+
+      // Start preloading all layers after main content is visible
+      if (designType === 'figma') {
+        preloadAllLayers();
         
-        const previewContainer = document.getElementById('previewContainer');
-        const iframeContainer = document.getElementById('iframeContainer');
-        const designFrame = document.getElementById('designFrame');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const backBtn = document.getElementById('backBtn');
+        // Make sure first image is visible
+        if (previewImage) {
+          previewImage.onload = () => {
+            previewImage.classList.remove('loading');
+          };
+          // Fallback in case onload doesn't fire
+          setTimeout(() => {
+            if (previewImage.classList.contains('loading')) {
+              previewImage.classList.remove('loading');
+            }
+          }, 1000);
+        }
+      }
+    }, loadingDuration);
+
+    // For PDF: Hide loading overlay after iframe loads
+    if (designType === 'pdf' && designFrame && loadingOverlay) {
+      designFrame.onload = () => {
+        loadingOverlay.classList.add('hidden');
+      };
+      setTimeout(() => {
+        loadingOverlay.classList.add('hidden');
+      }, 3000);
+    }
+
+    // For Figma: Layer switching with proper preloading
+    function switchLayer(layerIndex) {
+      if (isLayerSwitching || layerIndex === currentLayerIndex || layers.length === 0) return;
+      
+      const layer = layers[layerIndex];
+      if (!layer || !layer.layer_preview_url || !previewImage) return;
+
+      isLayerSwitching = true;
+
+      // Disable dropdown during switch
+      if (pageSelect) pageSelect.disabled = true;
+
+      // Show loading overlay
+      if (layerLoadingOverlay) {
+        layerLoadingOverlay.classList.add('show');
+      }
+
+      // Hide current image
+      previewImage.classList.add('loading');
+
+      // Check if image is already preloaded
+      if (preloadedImages.has(layerIndex)) {
+        // Use cached image
+        const cachedImg = preloadedImages.get(layerIndex);
+        previewImage.src = cachedImg.src;
         
-        function loadFullView() {
-          previewContainer.style.display = 'none';
-          iframeContainer.classList.add('active');
-          backBtn.classList.add('visible');
-          
-          if (!isFullViewLoaded) {
-            const src = designFrame.getAttribute('data-src');
-            designFrame.src = src;
-            isFullViewLoaded = true;
-            
-            setTimeout(() => {
-              loadingOverlay.classList.add('hidden');
-            }, 3000);
-            
-            designFrame.onload = function() {
-              loadingOverlay.classList.add('hidden');
-            };
-          } else {
-            loadingOverlay.classList.add('hidden');
+        // Give browser time to render
+        setTimeout(() => {
+          previewImage.classList.remove('loading');
+          if (layerLoadingOverlay) {
+            layerLoadingOverlay.classList.remove('show');
           }
-        }
+          if (pageSelect) pageSelect.disabled = false;
+          isLayerSwitching = false;
+          currentLayerIndex = layerIndex;
+          console.log(\`✅ Switched to layer \${layerIndex} (from cache)\`);
+        }, 100);
+      } else {
+        // Load image if not cached
+        const img = new Image();
         
-        function showPreview() {
-          previewContainer.style.display = 'flex';
-          iframeContainer.classList.remove('active');
-          backBtn.classList.remove('visible');
-        }
-        
-        function copyLink() {
-          const link = window.location.href;
-          navigator.clipboard.writeText(link).then(() => {
-            const msg = document.getElementById('copiedMsg');
-            msg.classList.add('show');
+        img.onload = () => {
+          previewImage.src = img.src;
+          preloadedImages.set(layerIndex, img);
+          
+          // Wait for browser to render the image
+          requestAnimationFrame(() => {
             setTimeout(() => {
-              msg.classList.remove('show');
-            }, 2000);
-          }).catch(err => {
-            console.error('Failed to copy:', err);
-            alert('Failed to copy link');
+              previewImage.classList.remove('loading');
+              if (layerLoadingOverlay) {
+                layerLoadingOverlay.classList.remove('show');
+              }
+              if (pageSelect) pageSelect.disabled = false;
+              isLayerSwitching = false;
+              currentLayerIndex = layerIndex;
+              console.log(\`✅ Switched to layer \${layerIndex} (loaded)\`);
+            }, 100);
           });
+        };
+
+        img.onerror = () => {
+          console.error(\`❌ Failed to load layer \${layerIndex}: \${layer.layer_name}\`);
+          previewImage.classList.remove('loading');
+          if (layerLoadingOverlay) {
+            layerLoadingOverlay.classList.remove('show');
+          }
+          if (pageSelect) pageSelect.disabled = false;
+          isLayerSwitching = false;
+          
+          // Show error message
+          alert(\`Failed to load page: \${layer.layer_name}. Please try again.\`);
+        };
+
+        img.src = layer.layer_preview_url;
+      }
+    }
+
+    function switchPage(value) {
+      const idx = Number(value);
+      if (!isNaN(idx) && idx >= 0 && idx < layers.length) {
+        switchLayer(idx);
+      }
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        previewArea.requestFullscreen().catch(err => console.error('Fullscreen error:', err));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    // Initialize: Make sure layer 0 is selected on load
+    if (designType === 'figma' && layers.length > 0 && pageSelect) {
+      pageSelect.value = '0';
+      currentLayerIndex = 0;
+    }
+
+    // Prevent page select changes while switching
+    if (pageSelect) {
+      pageSelect.addEventListener('mousedown', (e) => {
+        if (isLayerSwitching) {
+          e.preventDefault();
         }
-      </script>
-    </body>
-    </html>
-    `;
+      });
+    }
+  </script>
+</body>
+</html>
+`;
 
     res.send(html);
 
