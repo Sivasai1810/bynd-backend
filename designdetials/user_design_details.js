@@ -56,7 +56,7 @@ async function fetchFigmaLayers(figmaUrl) {
 
     return layers;
   } catch (err) {
-    console.error("❌ Figma layers fetch error:", err.message);
+    console.error(" Figma layers fetch error:", err.message);
     return [];
   }
 }
@@ -79,7 +79,7 @@ async function generateImagePreview(imageBuffer, userId, submissionId) {
 
     return filePath;
   } catch (err) {
-    console.error("❌ Image preview error:", err);
+    console.error(" Image preview error:", err);
     return null;
   }
 }
@@ -114,7 +114,7 @@ async function generatePdfPreview(pdfPath, userId, submissionId) {
 
     return filePath;
   } catch (err) {
-    console.error("❌ PDF preview error:", err.message);
+    console.error(" PDF preview error:", err.message);
     return null;
   } finally {
     if (browser) await browser.close();
@@ -134,12 +134,12 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
       status = "pending",
     } = req.body;
 
-    // ✅ Validation
+    // Validation
     if (!user_id || !unique_id || !design_type || !company_name || !position) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // ✅ Normalize Design Type
+    //  Normalize Design Type
     let normalizedType = design_type.trim().toLowerCase();
     if (["image", "png", "jpeg", "jpg"].includes(normalizedType))
       normalizedType = "pdf"; // satisfies DB constraint
@@ -150,7 +150,7 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
       });
     }
 
-    // ✅ Handle File Upload
+    //  Handle File Upload
     let file_path = null;
     if (req.file) {
       const ext = req.file.mimetype.split("/")[1];
@@ -164,7 +164,7 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
         });
 
       if (error) {
-        console.error("❌ File upload error:", error.message);
+        console.error(" File upload error:", error.message);
         return res.status(500).json({
           error: "File upload failed",
           details: error.message,
@@ -173,8 +173,7 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
 
       file_path = data.path;
     }
-
-    // ✅ Prepare DB Entry
+    // Prepare DB Entry
     const shareableLink = generateShareableLink(unique_id);
 
     const submissionData = {
@@ -193,9 +192,9 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    console.log("🟦 Inserting:", submissionData);
+    console.log(" Inserting:", submissionData);
 
-    // ✅ Insert Submission
+    // Insert Submission
     const { data: submission, error: insertError } = await supabase_connect
       .from("design_submissions")
       .insert([submissionData])
@@ -203,16 +202,16 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
       .single();
 
     if (insertError) {
-      console.error("❌ Insert failed:", insertError.message);
+      console.error(" Insert failed:", insertError.message);
       return res.status(500).json({
         error: "Failed to store submission",
         details: insertError.message,
       });
     }
 
-    console.log(`✅ Submission stored for ${company_name} (${position})`);
+    console.log(` Submission stored for ${company_name} (${position})`);
 
-    // ✅ Generate Previews
+    //  Generate Previews
     if (normalizedType === "figma" && original_url) {
       const layers = await fetchFigmaLayers(original_url);
       if (layers.length) {
@@ -243,7 +242,7 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
           .eq("id", submission.id);
     }
 
-    // ✅ Success Response
+ 
     return res.status(201).json({
       success: true,
       message: "Design submission created successfully",
@@ -251,7 +250,7 @@ router.post("", upload.single("pdf_file"), async (req, res) => {
       submission,
     });
   } catch (err) {
-    console.error("🔥 Server error:", err);
+    console.error(" Server error:", err);
     res.status(500).json({ error: "Server error", details: err.message });
   }
 });

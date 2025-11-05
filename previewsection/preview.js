@@ -617,7 +617,7 @@ router.get('/:uniqueId', async (req, res) => {
       }
 
       isRefreshingUrls = true;
-      console.log('🔄 Refreshing expired URLs...');
+      console.log(' Refreshing expired URLs...');
 
       try {
         const response = await fetch(\`/preview/\${uniqueId}/refresh-urls\`);
@@ -767,7 +767,7 @@ router.get('/:uniqueId', async (req, res) => {
 
       // Check if URLs are expired
       if (areUrlsExpired()) {
-        console.log('⏰ URLs expired, refreshing...');
+        console.log(' URLs expired, refreshing...');
         const refreshed = await refreshLayerUrls();
         
         if (!refreshed) {
@@ -822,7 +822,7 @@ router.get('/:uniqueId', async (req, res) => {
       // Load new image
       const img = new Image();
       const timeoutId = setTimeout(() => {
-        console.error('⏱️ Image load timeout for layer', layerIndex);
+        console.error('Image load timeout for layer', layerIndex);
         img.onerror(new Error('Timeout'));
       }, 10000); // 10 second timeout
       
@@ -851,7 +851,7 @@ router.get('/:uniqueId', async (req, res) => {
         
         // If error, try refreshing URLs once
         if (!areUrlsExpired()) {
-          console.log('🔄 Image failed but URLs not expired, forcing refresh...');
+          console.log('Image failed but URLs not expired, forcing refresh...');
         }
         
         const refreshed = await refreshLayerUrls();
