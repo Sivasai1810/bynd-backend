@@ -63,7 +63,7 @@ router.delete('/delete/:uniqueId', async (req, res) => {
         if (deleteFileError) {
           console.error("PDF file deletion error:", deleteFileError);
         } else {
-          console.log(`✅ Deleted PDF file: ${submission.pdf_file_path}`);
+          console.log(`Deleted PDF file: ${submission.pdf_file_path}`);
         }
       } catch (fileErr) {
         console.error("Exception during PDF file deletion:", fileErr);
@@ -85,7 +85,7 @@ router.delete('/delete/:uniqueId', async (req, res) => {
         if (deleteThumbnailError) {
           console.error("Thumbnail deletion error:", deleteThumbnailError);
         } else {
-          console.log(`✅ Deleted thumbnail: ${thumbnailPath}`);
+          console.log(` Deleted thumbnail: ${thumbnailPath}`);
         }
       } catch (thumbErr) {
         console.error("Exception during thumbnail deletion:", thumbErr);
@@ -107,7 +107,7 @@ router.delete('/delete/:uniqueId', async (req, res) => {
       });
     }
 
-    console.log(`✅ Successfully deleted submission with unique_id: ${uniqueId}`);
+    console.log(` Successfully deleted submission with unique_id: ${uniqueId}`);
 
     return res.status(200).json({ 
       success: true,

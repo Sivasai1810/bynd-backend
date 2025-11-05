@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // your imports
 import userurl from "./profilefetching/userdatafetching.js";
@@ -12,10 +14,10 @@ import redirecturl from "./RedirectUrls/redirecturl.js";
 import fetching from "./profilefetching/fetchingprofile.js";
 import getstats from "./analytics/userstats.js"
 import Delete from "./designdetials/deletedesign.js"
-
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+
 
 // Allow multiple origins
 const allowedOrigins = [
