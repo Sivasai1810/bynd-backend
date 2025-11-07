@@ -1,9 +1,6 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import path from "path";
-import { fileURLToPath } from "url";
-
 // your imports
 import userurl from "./profilefetching/userdatafetching.js";
 import previewurls from "./previewsection/preview.js";
