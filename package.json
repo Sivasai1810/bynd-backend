@@ -22,6 +22,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
+    "p-limit": "^7.2.0",
     "puppeteer": "^24.26.1",
     "sharp": "^0.34.4",
     "uuid": "^13.0.0"

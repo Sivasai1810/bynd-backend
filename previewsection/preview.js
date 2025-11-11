@@ -398,22 +398,70 @@ router.get('/:uniqueId', async (req, res) => {
     .expand-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid #E5E7EB; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
     .expand-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
 
-    /* Preview Area */
-    .preview-area { background: #FFFFFF; border-radius: 20px; overflow: hidden; min-height: 600px; position: relative; display: flex; align-items: center; justify-content: center; }
+    /* Preview Area - Improved centering for all design sizes */
+    .preview-area { 
+      background: #FFFFFF; 
+      border-radius: 20px; 
+      overflow: hidden; 
+      min-height: 600px; 
+      position: relative; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      padding: 20px;
+    }
 
-    /* Figma Screenshot View */
-    .screenshot-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
-    .preview-image { width: 100%; height: 100%; object-fit: contain; display: block; max-height: 700px; transition: opacity 0.3s ease; }
-    .preview-image.loading { opacity: 0.3; }
+    /* Figma Screenshot View - Better centering */
+    .screenshot-container { 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      position: relative;
+      min-height: 600px;
+    }
+
+    .preview-image { 
+      max-width: 100%;
+      max-height: 700px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+      transition: opacity 0.3s ease;
+      margin: auto;
+    }
+
+    .preview-image.loading { 
+      opacity: 0.3; 
+    }
 
     /* Layer Loading Overlay */
     .layer-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: none; align-items: center; justify-content: center; z-index: 5; }
     .layer-loading-overlay.show { display: flex; }
     .mini-spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
-    /* PDF Iframe */
-    .iframe-container { width: 90%; height: 90%; position: relative; }
-    .design-frame { width: 100%; height: 600px; border: none; display: block; }
+    /* PDF Iframe - Better centering */
+    .iframe-container { 
+      width: 100%; 
+      max-width: 95%;
+      height: 100%; 
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 600px;
+    }
+
+    .design-frame { 
+      width: 100%; 
+      height: 600px; 
+      border: none; 
+      display: block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 8px;
+    }
 
     /* PDF Loading Overlay */
     .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
@@ -430,6 +478,22 @@ router.get('/:uniqueId', async (req, res) => {
       color: #991B1B;
       font-size: 14px;
       text-align: center;
+    }
+
+    /* Fullscreen mode improvements */
+    .preview-area:fullscreen {
+      background: #F9FAFB;
+      padding: 40px;
+    }
+
+    .preview-area:fullscreen .preview-image {
+      max-height: 90vh;
+      max-width: 90vw;
+    }
+
+    .preview-area:fullscreen .design-frame {
+      height: 90vh;
+      max-width: 90vw;
     }
 
     /* Info Panels */
@@ -461,7 +525,19 @@ router.get('/:uniqueId', async (req, res) => {
       .preview-header { flex-direction: column; align-items: flex-start; }
       .preview-controls { width: 100%; justify-content: flex-end; }
       .info-column { flex-direction: column; }
-      .design-frame { height: 450px; }
+      .preview-area {
+        min-height: 400px;
+        padding: 15px;
+      }
+      .screenshot-container {
+        min-height: 400px;
+      }
+      .preview-image {
+        max-height: 500px;
+      }
+      .design-frame { 
+        height: 450px; 
+      }
       .loading-logo { font-size: 24px; }
       .custom-dropdown { width: 100%; }
     }
@@ -620,7 +696,7 @@ router.get('/:uniqueId', async (req, res) => {
       }
 
       isRefreshingUrls = true;
-      console.log(' Refreshing expired URLs...');
+      console.log('🔄 Refreshing expired URLs...');
 
       try {
         const response = await fetch(\`/preview/\${uniqueId}/refresh-urls\`);
@@ -770,7 +846,7 @@ router.get('/:uniqueId', async (req, res) => {
 
       // Check if URLs are expired
       if (areUrlsExpired()) {
-        console.log(' URLs expired, refreshing...');
+        console.log('⏰ URLs expired, refreshing...');
         const refreshed = await refreshLayerUrls();
         
         if (!refreshed) {
