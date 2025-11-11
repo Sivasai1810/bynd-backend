@@ -213,35 +213,37 @@ router.get('/:uniqueId', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${design.position} - ${design.company_name}</title>
   
-  <style>
-    @font-face {
-      font-family: 'Circular Std';
-      src: url('/preview/fonts/circular-std/CircularStd-Book.ttf') format('truetype');
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'Circular Std';
-      src: url('/preview/fonts/circular-std/CircularStd-Medium.ttf') format('truetype');
-      font-weight: 500;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'Circular Std';
-      src: url('/preview/fonts/circular-std/CircularStd-Bold.ttf') format('truetype');
-      font-weight: 700;
-      font-style: normal;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'Circular Std';
-      src: url('/preview/fonts/circular-std/CircularStd-Black.ttf') format('truetype');
-      font-weight: 900;
-      font-style: normal;
-      font-display: swap;
-    }
+ <style>
+   
+   @font-face {
+  font-family: 'Circular Std';
+  src: url('/fonts/circular-std/CircularStd-Book.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Circular Std';
+  src: url('/fonts/circular-std/CircularStd-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Circular Std';
+  src: url('/fonts/circular-std/CircularStd-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Circular Std';
+  src: url('/fonts/circular-std/CircularStd-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 
     * { 
       margin: 0; 
@@ -269,10 +271,10 @@ router.get('/:uniqueId', async (req, res) => {
     .main-content.visible { opacity: 1; }
 
     /* Navbar */
-    .navbar { background: #FFFFFF; padding: 20px 32px; border-bottom: 2px solid #E5E7EB; }
-    .nav-content { max-width: 1400px; margin: 0 auto; }
+    .navbar { background: #FFFFFF; padding: 20px 0; border-bottom: 2px solid #E5E7EB; }
+    .nav-content { max-width: 1400px; margin: 0 auto; padding: 0 32px; }
     .nav-title { font-size: 22px; font-weight: 600; color: #111827; margin-bottom: 6px; }
-    .nav-meta { font-size: 14px; color: #6B7280; }
+    .nav-meta { font-size: 16px; color: #6B7280; }
 
     /* Page Container */
     .page-container { max-width: 1400px; margin: 0 auto; padding: 0 32px 24px 32px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
@@ -452,9 +454,10 @@ router.get('/:uniqueId', async (req, res) => {
 
     @media (max-width: 768px) {
       .page-container { padding: 16px; }
-      .navbar { padding: 16px 20px; }
+      .navbar { padding: 16px 0; }
+      .nav-content { padding: 0 20px; }
       .nav-title { font-size: 18px; }
-      .nav-meta { font-size: 13px; }
+      .nav-meta { font-size: 14px; }
       .preview-header { flex-direction: column; align-items: flex-start; }
       .preview-controls { width: 100%; justify-content: flex-end; }
       .info-column { flex-direction: column; }
