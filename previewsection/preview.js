@@ -1,10 +1,503 @@
+// import express from "express";
+// import { supabase_connect } from "../supabase/set-up.js";
+// import cookieParser from "cookie-parser";
+// const router = express.Router();
+// router.use(cookieParser());
+
+// // Endpoint to refresh expired signed URLs
+// router.get('/:uniqueId/refresh-urls', async (req, res) => {
+//   try {
+//     const { uniqueId } = req.params;
+
+//     if (!uniqueId) {
+//       return res.status(400).json({ error: "Missing unique ID" });
+//     }
+
+//     // Fetch design from database
+//     const { data: design, error } = await supabase_connect
+//       .from("design_submissions")
+//       .select("*")
+//       .eq('unique_id', uniqueId)
+//       .single();
+
+//     if (error || !design) {
+//       return res.status(404).json({ error: "Design not found" });
+//     }
+
+//     // Fetch layers if Figma design
+//     let layers = [];
+//     if (design.design_type === 'figma') {
+//       const { data: layersData, error: layersError } = await supabase_connect
+//         .from("design_layers")
+//         .select("*")
+//         .eq('submission_id', design.id)
+//         .order('layer_order', { ascending: true });
+
+//       if (!layersError && layersData && layersData.length > 0) {
+//         // Generate new signed URLs for each layer
+//         for (let layer of layersData) {
+//           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
+//           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
+          
+//           const { data: signedData, error: signedError } = await supabase_connect.storage
+//             .from('design_previews')
+//             .createSignedUrl(imagePath, 3600);
+          
+//           if (!signedError && signedData && signedData.signedUrl) {
+//             layer.layer_preview_url = signedData.signedUrl;
+//           } else {
+//             layer.layer_preview_url = null;
+//           }
+//         }
+        
+//         layers = layersData.map(layer => ({
+//           layer_name: layer.layer_name || 'Untitled',
+//           layer_order: layer.layer_order,
+//           layer_preview_url: layer.layer_preview_url || null
+//         }));
+//       }
+//     }
+
+//     res.json({ 
+//       success: true, 
+//       layers,
+//       expiresIn: 3600 
+//     });
+
+//   } catch (err) {
+//     console.error("URL refresh error:", err);
+//     res.status(500).json({ 
+//       error: "Failed to refresh URLs",
+//       details: err.message 
+//     });
+//   }
+// });
+
+// router.get('/:uniqueId', async (req, res) => {
+//   try {
+//     const { uniqueId } = req.params;
+
+//     if (!uniqueId) {
+//       return res.status(400).json({ error: "Missing unique ID" });
+//     }
+
+//     // Fetch design from database
+//     const { data: design, error } = await supabase_connect
+//       .from("design_submissions")
+//       .select("*")
+//       .eq('unique_id', uniqueId)
+//       .single();
+
+//     if (error) {
+//       if (error.code === 'PGRST116') {
+//         return res.status(404).json({ error: "Design not found" });
+//       }
+//       console.error("Fetch error:", error.message);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     if (!design) {
+//       return res.status(404).json({ error: "Design not found" });
+//     }
+
+//     // Fetch layers if Figma design (ordered by layer_order)
+//     let layers = [];
+//     if (design.design_type === 'figma') {
+//       const { data: layersData, error: layersError } = await supabase_connect
+//         .from("design_layers")
+//         .select("*")
+//         .eq('submission_id', design.id)
+//         .order('layer_order', { ascending: true });
+
+//       if (!layersError && layersData && layersData.length > 0) {
+//         // For each layer, fetch the preview image from storage
+//         for (let layer of layersData) {
+//           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
+//           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
+          
+//           const { data: signedData, error: signedError } = await supabase_connect.storage
+//             .from('design_previews')
+//             .createSignedUrl(imagePath, 3600);
+          
+//           if (!signedError && signedData && signedData.signedUrl) {
+//             layer.layer_preview_url = signedData.signedUrl;
+//           } else {
+//             console.error(`Could not fetch preview for layer: ${imagePath}`, signedError);
+//             layer.layer_preview_url = null;
+//           }
+//         }
+        
+//         layers = layersData;
+//       }
+//     }
+//     try {
+//   const updateData = {
+//     last_viewed_at: new Date().toISOString()
+//   };
+
+//   // Only update status if it's currently 'pending'
+//   if (design.status === 'pending') {
+//     updateData.status = 'viewed';
+//   }
+
+//   const { error: updateError } = await supabase_connect
+//     .from("design_submissions")
+//     .update(updateData)
+//     .eq('id', design.id);
+
+//   if (updateError) {
+//     console.error("Status update error:", updateError);
+//   } else {
+//     console.log(`✓ Updated design ${uniqueId}:`, {
+//       status: design.status === 'pending' ? 'pending → viewed' : design.status,
+//       last_viewed_at: updateData.last_viewed_at
+//     });
+//   }
+// } catch (updateErr) {
+//   console.error("Status update exception:", updateErr);
+// }
+
+// const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
+
+//     // const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
+//     // Generate signed URL for main preview thumbnail
+//     let previewImageUrl = null;
+//     if (design.preview_thumbnail) {
+//       const { data: signedData, error: signedError } = await supabase_connect.storage
+//         .from('design_previews')
+//         .createSignedUrl(design.preview_thumbnail, 3600);
+      
+//       if (!signedError && signedData && signedData.signedUrl) {
+//         previewImageUrl = signedData.signedUrl;
+//       }
+//     }
+
+//     // Determine full view URL for PDF (with toolbar disabled)
+//     let fullViewUrl = null;
+//     if (design.design_type === 'pdf') {
+//       const { data, error: signedUrlError } = await supabase_connect.storage
+//         .from('design_files')
+//         .createSignedUrl(design.pdf_file_path, 3600);
+      
+//       if (signedUrlError) {
+//         console.error("Signed URL error:", signedUrlError);
+//         return res.status(500).json({ error: "Failed to generate PDF URL" });
+//       }
+      
+//       // Add parameters to hide toolbar
+//       fullViewUrl = data.signedUrl + '#toolbar=0&navpanes=0&scrollbar=0';
+//     }
+
+//     // Get default layer preview URL (layer 0) for Figma designs
+//     let defaultLayerUrl = null;
+//     if (design.design_type === 'figma' && layers.length > 0 && layers[0].layer_preview_url) {
+//       defaultLayerUrl = layers[0].layer_preview_url;
+//     }
+
+//     // Serialize layers data for JavaScript - ensure it's valid JSON
+//     const layersJSON = JSON.stringify(layers.map(layer => ({
+//       layer_name: layer.layer_name || 'Untitled',
+//       layer_order: layer.layer_order,
+//       layer_preview_url: layer.layer_preview_url || null
+//     })));
+
+//     const html = `
 import express from "express";
 import { supabase_connect } from "../supabase/set-up.js";
 import cookieParser from "cookie-parser";
+import crypto from "crypto";
+
 const router = express.Router();
 router.use(cookieParser());
+router.use(express.json());
 
-// Endpoint to refresh expired signed URLs
+// Helper: Generate viewer fingerprint
+function generateFingerprint(ip, userAgent) {
+  return crypto
+    .createHash('sha256')
+    .update(`${ip}-${userAgent}`)
+    .digest('hex')
+    .substring(0, 32);
+}
+
+// Helper: Generate session ID
+function generateSessionId() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+// Endpoint: Initialize view session
+// router.post('/:uniqueId/start-session', async (req, res) => {
+//   try {
+//     const { uniqueId } = req.params;
+//     const viewerIp = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+//     const userAgent = req.headers['user-agent'] || 'unknown';
+//     const fingerprint = generateFingerprint(viewerIp, userAgent);
+
+//     // Fetch design
+//     const { data: design, error } = await supabase_connect
+//       .from("design_submissions")
+//       .select("id")
+//       .eq('unique_id', uniqueId)
+//       .single();
+
+//     if (error || !design) {
+//       return res.status(404).json({ error: "Design not found" });
+//     }
+
+//     // **CRITICAL FIX: Update last_viewed_at on EVERY view session start**
+//     const currentTimestamp = new Date().toISOString();
+    
+//     const { error: updateError } = await supabase_connect
+//       .from("design_submissions")
+//       .update({ last_viewed_at: currentTimestamp })
+//       .eq('id', design.id);
+
+//     if (updateError) {
+//       console.error("Failed to update last_viewed_at:", updateError);
+//       // Don't fail the request, just log the error
+//     } else {
+//       console.log(`✓ Updated last_viewed_at for submission ${design.id}`);
+//     }
+
+//     // Check if already viewed today (prevent duplicate counting)
+//     const today = new Date().toISOString().split('T')[0];
+//     const { data: existingView } = await supabase_connect
+//       .from("submission_views")
+//       .select("session_id, viewed_at")
+//       .eq('submission_id', design.id)
+//       .eq('viewer_fingerprint', fingerprint)
+//       .gte('viewed_at', `${today}T00:00:00Z`)
+//       .lte('viewed_at', `${today}T23:59:59Z`)
+//       .single();
+
+//     let sessionId;
+
+//     if (existingView) {
+//       // Return existing session
+//       sessionId = existingView.session_id;
+//       console.log(`📊 Returning existing session: ${sessionId}`);
+//     } else {
+//       // Create new view session
+//       sessionId = generateSessionId();
+      
+//       const { error: insertError } = await supabase_connect
+//         .from("submission_views")
+//         .insert({
+//           submission_id: design.id,
+//           viewer_fingerprint: fingerprint,
+//           viewer_ip: viewerIp,
+//           user_agent: userAgent,
+//           session_id: sessionId,
+//           viewed_at: currentTimestamp
+//         });
+
+//       if (insertError) {
+//         console.error("View tracking error:", insertError);
+//         // Don't fail the request, just log
+//       } else {
+//         console.log(`✓ New view session created: ${sessionId}`);
+        
+//         // Refresh analytics asynchronously (don't wait)
+//         supabase_connect.rpc('refresh_submission_analytics', {
+//           p_submission_id: design.id
+//         }).then(() => {
+//           console.log(`✓ Analytics refreshed for submission ${design.id}`);
+//         }).catch(err => {
+//           console.error("Analytics refresh error:", err);
+//         });
+//       }
+//     }
+
+//     res.json({ 
+//       success: true, 
+//       sessionId,
+//       isNewView: !existingView
+//     });
+
+//   } catch (err) {
+//     console.error("Session start error:", err);
+//     res.status(500).json({ error: "Failed to start session" });
+//   }
+// });
+router.post('/:uniqueId/start-session', async (req, res) => {
+  try {
+    const { uniqueId } = req.params;
+    const viewerIp = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    const fingerprint = generateFingerprint(viewerIp, userAgent);
+
+    // Fetch design
+    const { data: design, error } = await supabase_connect
+      .from("design_submissions")
+      .select("id")
+      .eq('unique_id', uniqueId)
+      .single();
+
+    if (error || !design) {
+      return res.status(404).json({ error: "Design not found" });
+    }
+
+    // Update last_viewed_at on EVERY view
+    const currentTimestamp = new Date().toISOString();
+    
+    const { error: updateError } = await supabase_connect
+      .from("design_submissions")
+      .update({ 
+        last_viewed_at: currentTimestamp,
+        status: 'viewed'
+      })
+      .eq('id', design.id);
+
+    if (updateError) {
+      console.error("Failed to update last_viewed_at:", updateError);
+    } else {
+      console.log(`✓ Updated last_viewed_at for submission ${design.id}`);
+    }
+
+    // Check if this fingerprint has EVER viewed this submission before
+    const { data: existingFingerprint } = await supabase_connect
+      .from("submission_views")
+      .select("viewer_fingerprint")
+      .eq('submission_id', design.id)
+      .eq('viewer_fingerprint', fingerprint)
+      .limit(1)
+      .maybeSingle();
+
+    const isFirstViewFromFingerprint = !existingFingerprint;
+
+    // ALWAYS CREATE A NEW VIEW SESSION (for total views)
+    const sessionId = generateSessionId();
+    
+    const { error: insertError } = await supabase_connect
+      .from("submission_views")
+      .insert({
+        submission_id: design.id,
+        viewer_fingerprint: fingerprint,
+        viewer_ip: viewerIp,
+        user_agent: userAgent,
+        session_id: sessionId,
+        viewed_at: currentTimestamp,
+        is_first_view_from_fingerprint: isFirstViewFromFingerprint
+      });
+
+    if (insertError) {
+      console.error("View tracking error:", insertError);
+      return res.status(500).json({ error: "Failed to track view" });
+    }
+
+    console.log(`✓ New view session created: ${sessionId} (First from fingerprint: ${isFirstViewFromFingerprint})`);
+    
+    // The trigger will automatically refresh analytics, but we can also call it manually for consistency
+    supabase_connect.rpc('refresh_submission_analytics', {
+      p_submission_id: design.id
+    }).then(() => {
+      console.log(`✓ Analytics refreshed for submission ${design.id}`);
+    }).catch(err => {
+      console.error("Analytics refresh error:", err);
+    });
+
+    res.json({ 
+      success: true, 
+      sessionId,
+      isNewView: true,
+      isFirstViewFromFingerprint: isFirstViewFromFingerprint
+    });
+
+  } catch (err) {
+    console.error("Session start error:", err);
+    res.status(500).json({ error: "Failed to start session" });
+  }
+});
+// Endpoint: Update session activity (time spent, pages viewed)
+router.post('/:uniqueId/update-session', async (req, res) => {
+  try {
+    const { uniqueId } = req.params;
+    const { sessionId, timeSpent, pagesViewed, maxPageViewed } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "Missing session ID" });
+    }
+
+    // Determine if engaged (>30 seconds OR viewed >2 pages)
+    const engaged = timeSpent >= 30 || pagesViewed >= 3;
+
+    const { error } = await supabase_connect
+      .from("submission_views")
+      .update({
+        last_activity_at: new Date().toISOString(),
+        time_spent_seconds: timeSpent,
+        pages_viewed: pagesViewed,
+        max_pages_viewed: maxPageViewed || pagesViewed,
+        engaged: engaged
+      })
+      .eq('session_id', sessionId);
+
+    if (error) {
+      console.error("Session update error:", error);
+      return res.status(500).json({ error: "Failed to update session" });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Session update error:", err);
+    res.status(500).json({ error: "Failed to update session" });
+  }
+})
+// Endpoint: Get submission analytics
+router.get('/:uniqueId/analytics', async (req, res) => {
+  try {
+    const { uniqueId } = req.params;
+
+    // Fetch design
+    const { data: design, error: designError } = await supabase_connect
+      .from("design_submissions")
+      .select("id, created_at")
+      .eq('unique_id', uniqueId)
+      .single();
+
+    if (designError || !design) {
+      return res.status(404).json({ error: "Design not found" });
+    }
+
+    // Fetch analytics
+    const { data: analytics, error: analyticsError } = await supabase_connect
+      .from("submission_analytics")
+      .select("*")
+      .eq('submission_id', design.id)
+      .single();
+
+    if (analyticsError && analyticsError.code !== 'PGRST116') {
+      console.error("Analytics fetch error:", analyticsError);
+    }
+
+    // Calculate submission age in days
+    const submissionAge = Math.floor(
+      (Date.now() - new Date(design.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    res.json({
+      success: true,
+      analytics: {
+        totalViews: analytics?.total_views || 0,
+        uniqueViewers: analytics?.unique_viewers || 0,
+        averageTimePerView: analytics?.avg_time_per_view_seconds || 0,
+        submissionAge: submissionAge,
+        firstViewedAt: analytics?.first_viewed_at || null,
+        lastViewedAt: analytics?.last_viewed_at || null,
+        engagementScore: analytics?.engagement_score || 0,
+        status: analytics?.first_viewed_at ? 'viewed' : 'pending',
+        averagePagesViewed: analytics?.avg_pages_viewed || 0
+      }
+    });
+
+  } catch (err) {
+    console.error("Analytics fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch analytics" });
+  }
+});
+
+// Endpoint: Refresh expired signed URLs
 router.get('/:uniqueId/refresh-urls', async (req, res) => {
   try {
     const { uniqueId } = req.params;
@@ -13,7 +506,6 @@ router.get('/:uniqueId/refresh-urls', async (req, res) => {
       return res.status(400).json({ error: "Missing unique ID" });
     }
 
-    // Fetch design from database
     const { data: design, error } = await supabase_connect
       .from("design_submissions")
       .select("*")
@@ -24,7 +516,6 @@ router.get('/:uniqueId/refresh-urls', async (req, res) => {
       return res.status(404).json({ error: "Design not found" });
     }
 
-    // Fetch layers if Figma design
     let layers = [];
     if (design.design_type === 'figma') {
       const { data: layersData, error: layersError } = await supabase_connect
@@ -34,7 +525,6 @@ router.get('/:uniqueId/refresh-urls', async (req, res) => {
         .order('layer_order', { ascending: true });
 
       if (!layersError && layersData && layersData.length > 0) {
-        // Generate new signed URLs for each layer
         for (let layer of layersData) {
           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
@@ -73,6 +563,9 @@ router.get('/:uniqueId/refresh-urls', async (req, res) => {
   }
 });
 
+// Main preview route
+// ... (keep all your existing imports and helper functions)
+
 router.get('/:uniqueId', async (req, res) => {
   try {
     const { uniqueId } = req.params;
@@ -81,7 +574,6 @@ router.get('/:uniqueId', async (req, res) => {
       return res.status(400).json({ error: "Missing unique ID" });
     }
 
-    // Fetch design from database
     const { data: design, error } = await supabase_connect
       .from("design_submissions")
       .select("*")
@@ -96,11 +588,30 @@ router.get('/:uniqueId', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    if (!design) {
-      return res.status(404).json({ error: "Design not found" });
-    }
+   if (!design) {
+  return res.status(404).json({ error: "Design not found" });
+}
 
-    // Fetch layers if Figma design (ordered by layer_order)
+//  ADD THIS BLOCK HERE (DO NOT REMOVE ANY EXISTING CODE)
+try {
+  const { error: updateError } = await supabase_connect
+    .from("design_submissions")
+    .update({
+      last_viewed_at: new Date().toISOString(),
+      status:'viewed'
+    })
+    .eq('id', design.id);
+
+  if (updateError) {
+    console.error(" Failed to update last_viewed_at:", updateError);
+  } else {
+    console.log(" last_viewed_at updated for preview:", uniqueId);
+  }
+} catch (err) {
+  console.error(" Error updating last_viewed_at:", err);
+}
+
+    // Fetch layers if Figma design
     let layers = [];
     if (design.design_type === 'figma') {
       const { data: layersData, error: layersError } = await supabase_connect
@@ -110,7 +621,6 @@ router.get('/:uniqueId', async (req, res) => {
         .order('layer_order', { ascending: true });
 
       if (!layersError && layersData && layersData.length > 0) {
-        // For each layer, fetch the preview image from storage
         for (let layer of layersData) {
           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
@@ -133,37 +643,6 @@ router.get('/:uniqueId', async (req, res) => {
 
     const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
 
-    const viewCookieName = `viewed_${uniqueId}`;
-    const hasViewedBefore = req.cookies[viewCookieName];
-
-    if (!hasViewedBefore) {
-      const currentViews = design.total_views || 0;
-      const newStatus = design.status === 'pending' ? 'viewed' : design.status;
-
-      const { error: updateError } = await supabase_connect
-        .from("design_submissions")
-        .update({ 
-          total_views: currentViews + 1,
-          last_viewed_at: new Date().toISOString(),
-          status: newStatus
-        })
-        .eq('id', design.id);
-
-      if (updateError) {
-        console.error("View update error:", updateError);
-      } else {
-        console.log(`View tracked for ${uniqueId}. Status: ${design.status} → ${newStatus}, Views: ${currentViews} → ${currentViews + 1}`);
-      }
-
-      res.cookie(viewCookieName, 'true', {
-        maxAge: 24 * 60 * 60 * 1000,
-        httpOnly: true
-      });
-
-    } else {
-      console.log(`Duplicate view prevented for ${uniqueId} (cookie exists)`);
-    }
-
     // Generate signed URL for main preview thumbnail
     let previewImageUrl = null;
     if (design.preview_thumbnail) {
@@ -175,8 +654,6 @@ router.get('/:uniqueId', async (req, res) => {
         previewImageUrl = signedData.signedUrl;
       }
     }
-
-    // Determine full view URL for PDF (with toolbar disabled)
     let fullViewUrl = null;
     if (design.design_type === 'pdf') {
       const { data, error: signedUrlError } = await supabase_connect.storage
@@ -188,22 +665,22 @@ router.get('/:uniqueId', async (req, res) => {
         return res.status(500).json({ error: "Failed to generate PDF URL" });
       }
       
-      // Add parameters to hide toolbar
       fullViewUrl = data.signedUrl + '#toolbar=0&navpanes=0&scrollbar=0';
     }
 
-    // Get default layer preview URL (layer 0) for Figma designs
+    // Get default layer preview URL
     let defaultLayerUrl = null;
     if (design.design_type === 'figma' && layers.length > 0 && layers[0].layer_preview_url) {
       defaultLayerUrl = layers[0].layer_preview_url;
     }
 
-    // Serialize layers data for JavaScript - ensure it's valid JSON
     const layersJSON = JSON.stringify(layers.map(layer => ({
       layer_name: layer.layer_name || 'Untitled',
       layer_order: layer.layer_order,
       layer_preview_url: layer.layer_preview_url || null
     })));
+
+    const totalLayers = layers.length;
 
     const html = `
 <!DOCTYPE html>
@@ -213,37 +690,35 @@ router.get('/:uniqueId', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${design.position} - ${design.company_name}</title>
   
- <style>
-   
-   @font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular-std/CircularStd-Book.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular-std/CircularStd-Medium.ttf') format('truetype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular-std/CircularStd-Bold.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Circular Std';
-  src: url('/fonts/circular-std/CircularStd-Black.ttf') format('truetype');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
+  <style>
+    @font-face {
+      font-family: 'Circular Std';
+      src: url('/fonts/circular-std/CircularStd-Book.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Circular Std';
+      src: url('/fonts/circular-std/CircularStd-Medium.ttf') format('truetype');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Circular Std';
+      src: url('/fonts/circular-std/CircularStd-Bold.ttf') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Circular Std';
+      src: url('/fonts/circular-std/CircularStd-Black.ttf') format('truetype');
+      font-weight: 900;
+      font-style: normal;
+      font-display: swap;
+    }
 
     * { 
       margin: 0; 
@@ -257,7 +732,6 @@ router.get('/:uniqueId', async (req, res) => {
       min-height: 100vh; 
       color: #111827; 
     }
-    /* Loading Screen */
     .loading-screen { position: fixed; inset: 0; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
     .loading-screen.fade-out { opacity: 0; pointer-events: none; }
     .loading-logo { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 24px; letter-spacing: -0.5px; }
@@ -266,23 +740,18 @@ router.get('/:uniqueId', async (req, res) => {
     .loading-subtext { color: #9CA3AF; font-size: 13px; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* Main Content */
     .main-content { opacity: 0; transition: opacity 0.5s ease; }
     .main-content.visible { opacity: 1; }
 
-    /* Navbar */
     .navbar { background: #FFFFFF; padding: 20px 0; border-bottom: 2px solid #E5E7EB; }
     .nav-content { max-width: 1400px; margin: 0 auto; padding: 0 32px; }
     .nav-title { font-size: 22px; font-weight: 600; color: #111827; margin-bottom: 6px; }
     .nav-meta { font-size: 16px; color: #6B7280; }
 
-    /* Page Container */
     .page-container { max-width: 1400px; margin: 0 auto; padding: 0 32px 24px 32px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
 
-    /* Content Area */
     .content-area { background: #F9FAFB; border-radius: 0; padding: 24px 20px 20px 20px; min-height: 600px; position: relative; }
 
-    /*  Custom Dropdown - Clean Figma Style */
     .custom-dropdown { 
       position: relative; 
       width: 210px;
@@ -345,7 +814,6 @@ router.get('/:uniqueId', async (req, res) => {
       transform: rotate(180deg);
     }
 
-    /* Dropdown Menu */
     .dropdown-menu {
       position: absolute;
       top: calc(100% + 6px);
@@ -390,15 +858,12 @@ router.get('/:uniqueId', async (req, res) => {
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Preview Header */
     .preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
     .preview-controls { display: flex; gap: 8px; align-items: center; }
 
-    /* Expand Button */
     .expand-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid #E5E7EB; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
     .expand-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
 
-    /* Preview Area - Improved centering for all design sizes */
     .preview-area { 
       background: #FFFFFF; 
       border-radius: 20px; 
@@ -411,7 +876,6 @@ router.get('/:uniqueId', async (req, res) => {
       padding: 20px;
     }
 
-    /* Figma Screenshot View - Better centering */
     .screenshot-container { 
       width: 100%; 
       height: 100%; 
@@ -437,12 +901,10 @@ router.get('/:uniqueId', async (req, res) => {
       opacity: 0.3; 
     }
 
-    /* Layer Loading Overlay */
     .layer-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: none; align-items: center; justify-content: center; z-index: 5; }
     .layer-loading-overlay.show { display: flex; }
     .mini-spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
-    /* PDF Iframe - Better centering */
     .iframe-container { 
       width: 100%; 
       max-width: 95%;
@@ -463,13 +925,11 @@ router.get('/:uniqueId', async (req, res) => {
       border-radius: 8px;
     }
 
-    /* PDF Loading Overlay */
     .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
     .loading-overlay.hidden { display: none; }
     .spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
     .loading-text-small { margin-top: 12px; color: #6B7280; font-size: 14px; font-weight: 500; }
 
-    /* Error Message */
     .error-message {
       padding: 16px;
       background: #FEE2E2;
@@ -480,7 +940,6 @@ router.get('/:uniqueId', async (req, res) => {
       text-align: center;
     }
 
-    /* Fullscreen mode improvements */
     .preview-area:fullscreen {
       background: #F9FAFB;
       padding: 40px;
@@ -496,7 +955,6 @@ router.get('/:uniqueId', async (req, res) => {
       max-width: 90vw;
     }
 
-    /* Info Panels */
     .info-column { display: flex; flex-direction: column; gap: 16px; padding-top: 24px; }
     .info-panel.usage-terms { background: #FFFFFF; border-radius: 10px; overflow: hidden; border: 1px solid #FDE68A; }
     .info-panel.usage-terms h3 { font-size: 16px; font-weight: 600; color: #92400E; background: #FFFBEB; padding: 14px 16px; margin: 0; border-bottom: 1px solid #FDE68A; }
@@ -508,7 +966,6 @@ router.get('/:uniqueId', async (req, res) => {
     .info-panel.documentation ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
     .info-panel.documentation li { margin-bottom: 6px; }
 
-    /* Responsive */
     @media (max-width: 1100px) {
       .page-container { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
       .design-frame { height: 500px; }
@@ -544,7 +1001,6 @@ router.get('/:uniqueId', async (req, res) => {
   </style>
 </head>
 <body>
-  <!-- Loading Screen -->
   <div class="loading-screen" id="loadingScreen">
     <div class="loading-logo">The BYND</div>
     <div class="loading-spinner"></div>
@@ -552,7 +1008,6 @@ router.get('/:uniqueId', async (req, res) => {
     <div class="loading-subtext">Preparing ${layers.length > 0 ? layers.length + ' pages' : 'your preview'}</div>
   </div>
 
-  <!-- Main Content -->
   <div class="main-content" id="mainContent">
     <div class="navbar">
       <div class="nav-content">
@@ -565,7 +1020,6 @@ router.get('/:uniqueId', async (req, res) => {
       <div class="content-area">
         <div class="preview-header">
           ${design.design_type === 'figma' && layers.length > 0 ? `
-          <!-- Custom Dropdown -->
           <div class="custom-dropdown" id="customDropdown">
             <div class="dropdown-trigger" id="dropdownTrigger">
               <div class="dropdown-label">
@@ -597,7 +1051,6 @@ router.get('/:uniqueId', async (req, res) => {
 
         <div class="preview-area" id="previewArea">
           ${design.design_type === 'figma' ? `
-          <!-- FIGMA: Screenshot preview with layer switching -->
           <div class="screenshot-container" id="screenshotContainer">
             <div class="layer-loading-overlay" id="layerLoadingOverlay">
               <div class="mini-spinner"></div>
@@ -609,7 +1062,6 @@ router.get('/:uniqueId', async (req, res) => {
             `}
           </div>
           ` : `
-          <!-- PDF: Iframe view without toolbar -->
           <div class="iframe-container" id="iframeContainer">
             <div class="loading-overlay" id="loadingOverlay">
               <div class="spinner"></div>
@@ -644,7 +1096,115 @@ router.get('/:uniqueId', async (req, res) => {
   </div>
 
   <script>
-    // Parse layers with error handling
+    // ========================================
+    // ANALYTICS TRACKING - CONSOLIDATED
+    // ========================================
+    console.log('🔧 Analytics script loaded');
+    
+    // Analytics variables
+    let sessionId = null;
+    let startTime = Date.now();
+    let currentPage = 1;
+    let maxPageViewed = 1;
+    let totalLayers = ${totalLayers};
+    let trackingInterval = null;
+
+    // Initialize session
+    async function initSession() {
+      console.log(' Initializing analytics session...');
+      try {
+        const response = await fetch('/BYNDLINK/view/${uniqueId}/start-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        console.log('📡 Session response status:', response.status);
+        
+        const data = await response.json();
+        console.log('📊 Session data:', data);
+        
+        if (data.success) {
+          sessionId = data.sessionId;
+          console.log('✓ Session initialized:', sessionId, data.isNewView ? '(new view)' : '(returning)');
+          
+          // Start periodic tracking
+          startTracking();
+        } else {
+          console.error('❌ Session init failed:', data);
+        }
+      } catch (err) {
+        console.error('❌ Session init error:', err);
+      }
+    }
+
+    // Start tracking interval
+    function startTracking() {
+      console.log('⏰ Starting tracking interval (10s)');
+      trackingInterval = setInterval(() => {
+        updateSession();
+      }, 10000);
+    }
+
+    // Update session with current metrics
+    async function updateSession() {
+      if (!sessionId) {
+        console.warn('⚠️ No session ID, skipping update');
+        return;
+      }
+      
+      const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+      console.log('📤 Updating session:', { timeSpent, currentPage, maxPageViewed });
+      
+      try {
+const response = await fetch('/BYNDLINK/view/${uniqueId}/update-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            timeSpent: timeSpent,
+            pagesViewed: currentPage,
+            maxPageViewed: maxPageViewed
+          })
+        });
+        
+        const data = await response.json();
+        console.log('✓ Session updated:', data);
+      } catch (err) {
+        console.error('❌ Session update error:', err);
+      }
+    }
+
+    // Track page changes
+    function trackPageView(pageIndex) {
+      currentPage = pageIndex + 1;
+      maxPageViewed = Math.max(maxPageViewed, currentPage);
+      console.log(\`📄 Page viewed: \${currentPage}/\${totalLayers}\`);
+      
+      // Immediately update session
+      updateSession();
+    }
+
+    // Final update before leaving
+    window.addEventListener('beforeunload', () => {
+      if (sessionId) {
+        const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+        const data = JSON.stringify({
+          sessionId: sessionId,
+          timeSpent: timeSpent,
+          pagesViewed: currentPage,
+          maxPageViewed: maxPageViewed
+        });
+        
+        console.log('👋 Sending final beacon:', data);
+navigator.sendBeacon('/BYNDLINK/view/${uniqueId}/update-session',
+          new Blob([data], { type: 'application/json' })
+        );
+      }
+    });
+
+    // ========================================
+    // LAYER SWITCHING & UI CODE
+    // ========================================
     let layers = [];
     try {
       layers = ${layersJSON};
@@ -659,11 +1219,10 @@ router.get('/:uniqueId', async (req, res) => {
     let currentLayerIndex = 0;
     let isLayerSwitching = false;
     let isInitialized = false;
-    let urlsExpireAt = Date.now() + (3600 * 1000); // URLs expire in 1 hour
+    let urlsExpireAt = Date.now() + (3600 * 1000);
     const preloadedImages = new Map();
     let isRefreshingUrls = false;
 
-    // Get DOM elements
     const loadingScreen = document.getElementById('loadingScreen');
     const mainContent = document.getElementById('mainContent');
     const previewArea = document.getElementById('previewArea');
@@ -682,13 +1241,11 @@ router.get('/:uniqueId', async (req, res) => {
     console.log('Design type:', designType);
     console.log('Total layers:', layers.length);
 
-    // Check if URLs are expired or about to expire (within 5 minutes)
     function areUrlsExpired() {
       const fiveMinutes = 5 * 60 * 1000;
       return Date.now() > (urlsExpireAt - fiveMinutes);
     }
 
-    // Refresh expired URLs
     async function refreshLayerUrls() {
       if (isRefreshingUrls) {
         console.log('Already refreshing URLs...');
@@ -699,7 +1256,7 @@ router.get('/:uniqueId', async (req, res) => {
       console.log('🔄 Refreshing expired URLs...');
 
       try {
-        const response = await fetch(\`/preview/\${uniqueId}/refresh-urls\`);
+const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
         
         if (!response.ok) {
           throw new Error('Failed to refresh URLs');
@@ -708,20 +1265,14 @@ router.get('/:uniqueId', async (req, res) => {
         const data = await response.json();
         
         if (data.layers && Array.isArray(data.layers)) {
-          // Update layers with new URLs
           data.layers.forEach((newLayer, idx) => {
             if (layers[idx] && newLayer.layer_preview_url) {
               layers[idx].layer_preview_url = newLayer.layer_preview_url;
             }
           });
 
-          // Clear preloaded images cache
           preloadedImages.clear();
-          
-          // Update expiry time
           urlsExpireAt = Date.now() + (3600 * 1000);
-          
-          // Preload all layers again
           preloadAllLayers();
 
           console.log('✓ URLs refreshed successfully');
@@ -737,7 +1288,6 @@ router.get('/:uniqueId', async (req, res) => {
       }
     }
 
-    // Preload all Figma layer images
     function preloadAllLayers() {
       if (designType !== 'figma' || layers.length === 0) return;
       
@@ -760,9 +1310,7 @@ router.get('/:uniqueId', async (req, res) => {
       });
     }
 
-    // Initialize dropdown if it exists
     if (customDropdown && dropdownTrigger && dropdownMenu && layers.length > 0) {
-      // Toggle dropdown
       dropdownTrigger.addEventListener('click', (e) => {
         e.stopPropagation();
         if (isLayerSwitching) return;
@@ -775,7 +1323,6 @@ router.get('/:uniqueId', async (req, res) => {
         }
       });
 
-      // Select option
       const dropdownOptions = dropdownMenu.querySelectorAll('.dropdown-option');
       dropdownOptions.forEach(option => {
         option.addEventListener('click', (e) => {
@@ -787,7 +1334,6 @@ router.get('/:uniqueId', async (req, res) => {
         });
       });
 
-      // Close dropdown when clicking outside
       document.addEventListener('click', (e) => {
         if (!customDropdown.contains(e.target)) {
           closeDropdown();
@@ -812,12 +1358,10 @@ router.get('/:uniqueId', async (req, res) => {
           return;
         }
 
-        // Update selected text
         if (selectedOption && layers[index]) {
           selectedOption.textContent = layers[index].layer_name || \`Page \${index + 1}\`;
         }
 
-        // Update selected class
         dropdownOptions.forEach((opt, idx) => {
           if (idx === index) {
             opt.classList.add('selected');
@@ -831,7 +1375,6 @@ router.get('/:uniqueId', async (req, res) => {
       }
     }
 
-    // Figma layer switching with preloading
     async function switchLayer(layerIndex) {
       if (isLayerSwitching || layerIndex === currentLayerIndex || layers.length === 0) {
         console.log('Switch prevented:', { isLayerSwitching, layerIndex, currentLayerIndex });
@@ -844,7 +1387,6 @@ router.get('/:uniqueId', async (req, res) => {
         return;
       }
 
-      // Check if URLs are expired
       if (areUrlsExpired()) {
         console.log('⏰ URLs expired, refreshing...');
         const refreshed = await refreshLayerUrls();
@@ -858,24 +1400,19 @@ router.get('/:uniqueId', async (req, res) => {
       console.log(\`Switching from layer \${currentLayerIndex} to \${layerIndex}\`);
       isLayerSwitching = true;
 
-      // Disable dropdown trigger
       if (dropdownTrigger) {
         dropdownTrigger.classList.add('disabled');
       }
 
-      // Show loading overlay
       if (layerLoadingOverlay) {
         layerLoadingOverlay.classList.add('show');
       }
 
-      // Add loading class to image
       previewImage.classList.add('loading');
 
-      // Check if image is preloaded
       if (preloadedImages.has(layerIndex)) {
         const cachedImg = preloadedImages.get(layerIndex);
         
-        // Verify cached image is still valid
         if (cachedImg.complete && cachedImg.naturalHeight > 0) {
           previewImage.src = cachedImg.src;
           
@@ -890,20 +1427,21 @@ router.get('/:uniqueId', async (req, res) => {
             isLayerSwitching = false;
             currentLayerIndex = layerIndex;
             console.log(\`✓ Switched to layer \${layerIndex} (from cache)\`);
+            
+            // Track page view for analytics
+            trackPageView(layerIndex);
           }, 150);
           return;
         } else {
-          // Cached image is invalid, remove from cache
           preloadedImages.delete(layerIndex);
         }
       }
 
-      // Load new image
       const img = new Image();
       const timeoutId = setTimeout(() => {
         console.error('Image load timeout for layer', layerIndex);
         img.onerror(new Error('Timeout'));
-      }, 10000); // 10 second timeout
+      }, 10000);
       
       img.onload = () => {
         clearTimeout(timeoutId);
@@ -921,6 +1459,9 @@ router.get('/:uniqueId', async (req, res) => {
           isLayerSwitching = false;
           currentLayerIndex = layerIndex;
           console.log(\`✓ Switched to layer \${layerIndex} (newly loaded)\`);
+          
+          // Track page view for analytics
+          trackPageView(layerIndex);
         }, 150);
       };
 
@@ -928,7 +1469,6 @@ router.get('/:uniqueId', async (req, res) => {
         clearTimeout(timeoutId);
         console.error(\`✗ Failed to load layer \${layerIndex}:\`, layer.layer_name, e);
         
-        // If error, try refreshing URLs once
         if (!areUrlsExpired()) {
           console.log('Image failed but URLs not expired, forcing refresh...');
         }
@@ -936,7 +1476,6 @@ router.get('/:uniqueId', async (req, res) => {
         const refreshed = await refreshLayerUrls();
         
         if (refreshed) {
-          // Retry loading with new URL
           const retryImg = new Image();
           retryImg.onload = () => {
             previewImage.src = retryImg.src;
@@ -951,6 +1490,7 @@ router.get('/:uniqueId', async (req, res) => {
             isLayerSwitching = false;
             currentLayerIndex = layerIndex;
             console.log(\`✓ Switched to layer \${layerIndex} (after refresh)\`);
+            trackPageView(layerIndex);
           };
           retryImg.onerror = () => {
             previewImage.classList.remove('loading');
@@ -998,14 +1538,15 @@ router.get('/:uniqueId', async (req, res) => {
         loadingScreen.style.display = 'none';
         isInitialized = true;
         console.log('Page initialized');
+        
+        // CRITICAL: Initialize analytics AFTER page is ready
+        console.log('🎯 Starting analytics initialization...');
+        initSession();
       }, 500);
 
-      // Start preloading and handle initial image load for Figma designs
       if (designType === 'figma' && layers.length > 0) {
-        // Start preloading all layers
         preloadAllLayers();
         
-        // Handle first image load
         if (previewImage) {
           const firstImageLoaded = new Promise((resolve, reject) => {
             if (previewImage.complete && previewImage.naturalHeight > 0) {
@@ -1029,7 +1570,6 @@ router.get('/:uniqueId', async (req, res) => {
               }
             });
 
-          // Fallback timeout
           setTimeout(() => {
             if (previewImage.classList.contains('loading')) {
               console.warn('Image load timeout - removing loading state');
@@ -1040,7 +1580,6 @@ router.get('/:uniqueId', async (req, res) => {
       }
     }, loadingDuration);
 
-    // For PDF: Hide loading overlay after iframe loads
     if (designType === 'pdf' && designFrame && loadingOverlay) {
       let pdfLoaded = false;
       
@@ -1052,7 +1591,6 @@ router.get('/:uniqueId', async (req, res) => {
         }
       };
 
-      // Fallback timeout for PDF
       setTimeout(() => {
         if (!pdfLoaded) {
           console.warn('PDF load timeout - hiding overlay');
