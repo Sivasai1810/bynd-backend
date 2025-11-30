@@ -27,7 +27,8 @@ app.use('/fonts', express.static('fonts'));
 const allowedOrigins = [
   "http://localhost:3000",  // Fixed the space
   "http://localhost:5173",      
-  "https://bynd-final.vercel.app" 
+  "https://bynd-final.vercel.app" ,
+  "https://bynd-backend.onrender.com"
 ];
 
 app.use(cors({
