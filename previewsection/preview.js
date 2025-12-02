@@ -1,436 +1,147 @@
-// import express from "express";
-// import { supabase_connect } from "../supabase/set-up.js";
-// import cookieParser from "cookie-parser";
-// const router = express.Router();
-// router.use(cookieParser());
-
-// // Endpoint to refresh expired signed URLs
-// router.get('/:uniqueId/refresh-urls', async (req, res) => {
-//   try {
-//     const { uniqueId } = req.params;
-
-//     if (!uniqueId) {
-//       return res.status(400).json({ error: "Missing unique ID" });
-//     }
-
-//     // Fetch design from database
-//     const { data: design, error } = await supabase_connect
-//       .from("design_submissions")
-//       .select("*")
-//       .eq('unique_id', uniqueId)
-//       .single();
-
-//     if (error || !design) {
-//       return res.status(404).json({ error: "Design not found" });
-//     }
-
-//     // Fetch layers if Figma design
-//     let layers = [];
-//     if (design.design_type === 'figma') {
-//       const { data: layersData, error: layersError } = await supabase_connect
-//         .from("design_layers")
-//         .select("*")
-//         .eq('submission_id', design.id)
-//         .order('layer_order', { ascending: true });
-
-//       if (!layersError && layersData && layersData.length > 0) {
-//         // Generate new signed URLs for each layer
-//         for (let layer of layersData) {
-//           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
-//           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
-          
-//           const { data: signedData, error: signedError } = await supabase_connect.storage
-//             .from('design_previews')
-//             .createSignedUrl(imagePath, 3600);
-          
-//           if (!signedError && signedData && signedData.signedUrl) {
-//             layer.layer_preview_url = signedData.signedUrl;
-//           } else {
-//             layer.layer_preview_url = null;
-//           }
-//         }
-        
-//         layers = layersData.map(layer => ({
-//           layer_name: layer.layer_name || 'Untitled',
-//           layer_order: layer.layer_order,
-//           layer_preview_url: layer.layer_preview_url || null
-//         }));
-//       }
-//     }
-
-//     res.json({ 
-//       success: true, 
-//       layers,
-//       expiresIn: 3600 
-//     });
-
-//   } catch (err) {
-//     console.error("URL refresh error:", err);
-//     res.status(500).json({ 
-//       error: "Failed to refresh URLs",
-//       details: err.message 
-//     });
-//   }
-// });
-
-// router.get('/:uniqueId', async (req, res) => {
-//   try {
-//     const { uniqueId } = req.params;
-
-//     if (!uniqueId) {
-//       return res.status(400).json({ error: "Missing unique ID" });
-//     }
-
-//     // Fetch design from database
-//     const { data: design, error } = await supabase_connect
-//       .from("design_submissions")
-//       .select("*")
-//       .eq('unique_id', uniqueId)
-//       .single();
-
-//     if (error) {
-//       if (error.code === 'PGRST116') {
-//         return res.status(404).json({ error: "Design not found" });
-//       }
-//       console.error("Fetch error:", error.message);
-//       return res.status(500).json({ error: error.message });
-//     }
-
-//     if (!design) {
-//       return res.status(404).json({ error: "Design not found" });
-//     }
-
-//     // Fetch layers if Figma design (ordered by layer_order)
-//     let layers = [];
-//     if (design.design_type === 'figma') {
-//       const { data: layersData, error: layersError } = await supabase_connect
-//         .from("design_layers")
-//         .select("*")
-//         .eq('submission_id', design.id)
-//         .order('layer_order', { ascending: true });
-
-//       if (!layersError && layersData && layersData.length > 0) {
-//         // For each layer, fetch the preview image from storage
-//         for (let layer of layersData) {
-//           const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
-//           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
-          
-//           const { data: signedData, error: signedError } = await supabase_connect.storage
-//             .from('design_previews')
-//             .createSignedUrl(imagePath, 3600);
-          
-//           if (!signedError && signedData && signedData.signedUrl) {
-//             layer.layer_preview_url = signedData.signedUrl;
-//           } else {
-//             console.error(`Could not fetch preview for layer: ${imagePath}`, signedError);
-//             layer.layer_preview_url = null;
-//           }
-//         }
-        
-//         layers = layersData;
-//       }
-//     }
-//     try {
-//   const updateData = {
-//     last_viewed_at: new Date().toISOString()
-//   };
-
-//   // Only update status if it's currently 'pending'
-//   if (design.status === 'pending') {
-//     updateData.status = 'viewed';
-//   }
-
-//   const { error: updateError } = await supabase_connect
-//     .from("design_submissions")
-//     .update(updateData)
-//     .eq('id', design.id);
-
-//   if (updateError) {
-//     console.error("Status update error:", updateError);
-//   } else {
-//     console.log(`✓ Updated design ${uniqueId}:`, {
-//       status: design.status === 'pending' ? 'pending → viewed' : design.status,
-//       last_viewed_at: updateData.last_viewed_at
-//     });
-//   }
-// } catch (updateErr) {
-//   console.error("Status update exception:", updateErr);
-// }
-
-// const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
-
-//     // const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
-//     // Generate signed URL for main preview thumbnail
-//     let previewImageUrl = null;
-//     if (design.preview_thumbnail) {
-//       const { data: signedData, error: signedError } = await supabase_connect.storage
-//         .from('design_previews')
-//         .createSignedUrl(design.preview_thumbnail, 3600);
-      
-//       if (!signedError && signedData && signedData.signedUrl) {
-//         previewImageUrl = signedData.signedUrl;
-//       }
-//     }
-
-//     // Determine full view URL for PDF (with toolbar disabled)
-//     let fullViewUrl = null;
-//     if (design.design_type === 'pdf') {
-//       const { data, error: signedUrlError } = await supabase_connect.storage
-//         .from('design_files')
-//         .createSignedUrl(design.pdf_file_path, 3600);
-      
-//       if (signedUrlError) {
-//         console.error("Signed URL error:", signedUrlError);
-//         return res.status(500).json({ error: "Failed to generate PDF URL" });
-//       }
-      
-//       // Add parameters to hide toolbar
-//       fullViewUrl = data.signedUrl + '#toolbar=0&navpanes=0&scrollbar=0';
-//     }
-
-//     // Get default layer preview URL (layer 0) for Figma designs
-//     let defaultLayerUrl = null;
-//     if (design.design_type === 'figma' && layers.length > 0 && layers[0].layer_preview_url) {
-//       defaultLayerUrl = layers[0].layer_preview_url;
-//     }
-
-//     // Serialize layers data for JavaScript - ensure it's valid JSON
-//     const layersJSON = JSON.stringify(layers.map(layer => ({
-//       layer_name: layer.layer_name || 'Untitled',
-//       layer_order: layer.layer_order,
-//       layer_preview_url: layer.layer_preview_url || null
-//     })));
-
-//     const html = `
 import express from "express";
-import { supabase_connect } from "../supabase/set-up.js";
 import cookieParser from "cookie-parser";
 import crypto from "crypto";
+import { supabase_connect } from "../supabase/set-up.js";
 
 const router = express.Router();
+
 router.use(cookieParser());
 router.use(express.json());
 
-// Helper: Generate viewer fingerprint
-function generateFingerprint(ip, userAgent) {
+// Helper: fallback fingerprint (server-side hashed IP+UA) if client didn't send fp
+function generateFallbackFingerprint(ip, userAgent) {
   return crypto
-    .createHash('sha256')
-    .update(`${ip}-${userAgent}`)
-    .digest('hex')
+    .createHash("sha256")
+    .update(`${ip}::${userAgent}`)
+    .digest("hex")
     .substring(0, 32);
 }
 
-// Helper: Generate session ID
 function generateSessionId() {
-  return crypto.randomBytes(16).toString('hex');
+  return crypto.randomBytes(16).toString("hex");
 }
 
-// Endpoint: Initialize view session
-// router.post('/:uniqueId/start-session', async (req, res) => {
-//   try {
-//     const { uniqueId } = req.params;
-//     const viewerIp = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-//     const userAgent = req.headers['user-agent'] || 'unknown';
-//     const fingerprint = generateFingerprint(viewerIp, userAgent);
-
-//     // Fetch design
-//     const { data: design, error } = await supabase_connect
-//       .from("design_submissions")
-//       .select("id")
-//       .eq('unique_id', uniqueId)
-//       .single();
-
-//     if (error || !design) {
-//       return res.status(404).json({ error: "Design not found" });
-//     }
-
-//     // **CRITICAL FIX: Update last_viewed_at on EVERY view session start**
-//     const currentTimestamp = new Date().toISOString();
-    
-//     const { error: updateError } = await supabase_connect
-//       .from("design_submissions")
-//       .update({ last_viewed_at: currentTimestamp })
-//       .eq('id', design.id);
-
-//     if (updateError) {
-//       console.error("Failed to update last_viewed_at:", updateError);
-//       // Don't fail the request, just log the error
-//     } else {
-//       console.log(`✓ Updated last_viewed_at for submission ${design.id}`);
-//     }
-
-//     // Check if already viewed today (prevent duplicate counting)
-//     const today = new Date().toISOString().split('T')[0];
-//     const { data: existingView } = await supabase_connect
-//       .from("submission_views")
-//       .select("session_id, viewed_at")
-//       .eq('submission_id', design.id)
-//       .eq('viewer_fingerprint', fingerprint)
-//       .gte('viewed_at', `${today}T00:00:00Z`)
-//       .lte('viewed_at', `${today}T23:59:59Z`)
-//       .single();
-
-//     let sessionId;
-
-//     if (existingView) {
-//       // Return existing session
-//       sessionId = existingView.session_id;
-//       console.log(`📊 Returning existing session: ${sessionId}`);
-//     } else {
-//       // Create new view session
-//       sessionId = generateSessionId();
-      
-//       const { error: insertError } = await supabase_connect
-//         .from("submission_views")
-//         .insert({
-//           submission_id: design.id,
-//           viewer_fingerprint: fingerprint,
-//           viewer_ip: viewerIp,
-//           user_agent: userAgent,
-//           session_id: sessionId,
-//           viewed_at: currentTimestamp
-//         });
-
-//       if (insertError) {
-//         console.error("View tracking error:", insertError);
-//         // Don't fail the request, just log
-//       } else {
-//         console.log(`✓ New view session created: ${sessionId}`);
-        
-//         // Refresh analytics asynchronously (don't wait)
-//         supabase_connect.rpc('refresh_submission_analytics', {
-//           p_submission_id: design.id
-//         }).then(() => {
-//           console.log(`✓ Analytics refreshed for submission ${design.id}`);
-//         }).catch(err => {
-//           console.error("Analytics refresh error:", err);
-//         });
-//       }
-//     }
-
-//     res.json({ 
-//       success: true, 
-//       sessionId,
-//       isNewView: !existingView
-//     });
-
-//   } catch (err) {
-//     console.error("Session start error:", err);
-//     res.status(500).json({ error: "Failed to start session" });
-//   }
-// });
-router.post('/:uniqueId/start-session', async (req, res) => {
+/**
+ * POST /:uniqueId/start-session
+ * Body expects: { deviceFingerprint?: string }
+ *
+ * Behavior:
+ * - If client sends deviceFingerprint (recommended): use it to determine is_unique_viewer.
+ * - Otherwise generate a fallback fingerprint from viewer IP + UA (less accurate).
+ * - Always INSERT a new submission_views row (so total views increments).
+ * - The DB trigger auto_refresh_analytics AFTER INSERT should recalc analytics.
+ */
+router.post("/:uniqueId/start-session", async (req, res) => {
   try {
     const { uniqueId } = req.params;
-    const viewerIp = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const userAgent = req.headers['user-agent'] || 'unknown';
-    const fingerprint = generateFingerprint(viewerIp, userAgent);
+    if (!uniqueId) return res.status(400).json({ error: "Missing unique ID" });
+
+    const viewerIp = (
+      req.headers["x-forwarded-for"] ||
+      req.ip ||
+      req.connection?.remoteAddress ||
+      ""
+    )
+      .toString()
+      .split(",")[0]
+      .trim();
+
+    const userAgent = req.headers["user-agent"] || "unknown";
+
+    // prefer explicit client device fingerprint
+    let deviceFingerprint = (req.body && req.body.deviceFingerprint) || null;
+
+    // fallback to server-side computed fingerprint (less ideal)
+    if (!deviceFingerprint) {
+      deviceFingerprint = generateFallbackFingerprint(viewerIp, userAgent);
+    }
 
     // Fetch design
-    const { data: design, error } = await supabase_connect
+    const { data: design, error: designError } = await supabase_connect
       .from("design_submissions")
       .select("id")
-      .eq('unique_id', uniqueId)
+      .eq("unique_id", uniqueId)
       .single();
 
-    if (error || !design) {
+    if (designError || !design) {
       return res.status(404).json({ error: "Design not found" });
     }
 
-    // Update last_viewed_at on EVERY view
-    const currentTimestamp = new Date().toISOString();
-    
-    const { error: updateError } = await supabase_connect
+    const submissionId = design.id;
+    const now = new Date().toISOString();
+
+    // Update last_viewed_at and status (non-blocking)
+    await supabase_connect
       .from("design_submissions")
-      .update({ 
-        last_viewed_at: currentTimestamp,
-        status: 'viewed'
-      })
-      .eq('id', design.id);
+      .update({ last_viewed_at: now, status: "viewed" })
+      .eq("id", submissionId);
 
-    if (updateError) {
-      console.error("Failed to update last_viewed_at:", updateError);
-    } else {
-      console.log(`✓ Updated last_viewed_at for submission ${design.id}`);
-    }
-
-    // Check if this fingerprint has EVER viewed this submission before
-    const { data: existingFingerprint } = await supabase_connect
+    // Check whether this deviceFingerprint has been used before for THIS submission
+    const { data: existingDevice } = await supabase_connect
       .from("submission_views")
-      .select("viewer_fingerprint")
-      .eq('submission_id', design.id)
-      .eq('viewer_fingerprint', fingerprint)
+      .select("id")
+      .eq("submission_id", submissionId)
+      .eq("device_fingerprint", deviceFingerprint)
       .limit(1)
       .maybeSingle();
 
-    const isFirstViewFromFingerprint = !existingFingerprint;
+    const isUniqueViewer = !existingDevice;
 
-    // ALWAYS CREATE A NEW VIEW SESSION (for total views)
+    // Create a new session row to track total views/metrics
     const sessionId = generateSessionId();
-    
+
+    const insertPayload = {
+      submission_id: submissionId,
+      device_fingerprint: deviceFingerprint,
+      viewer_ip: viewerIp,
+      user_agent: userAgent,
+      session_id: sessionId,
+      viewed_at: now,
+      // keep these flags for analytics/triggers in DB:
+      is_unique_viewer: isUniqueViewer,
+      // keep old fields too so existing queries continue to work
+      viewer_fingerprint: deviceFingerprint, // optional - keep for compatibility
+    };
+
     const { error: insertError } = await supabase_connect
       .from("submission_views")
-      .insert({
-        submission_id: design.id,
-        viewer_fingerprint: fingerprint,
-        viewer_ip: viewerIp,
-        user_agent: userAgent,
-        session_id: sessionId,
-        viewed_at: currentTimestamp,
-        is_first_view_from_fingerprint: isFirstViewFromFingerprint
-      });
+      .insert(insertPayload);
 
     if (insertError) {
-      console.error("View tracking error:", insertError);
-      return res.status(500).json({ error: "Failed to track view" });
+      console.error("Insert error:", insertError);
+      return res.status(500).json({ error: "Failed to insert session" });
     }
 
-    console.log(`✓ New view session created: ${sessionId} (First from fingerprint: ${isFirstViewFromFingerprint})`);
-    
-    // The trigger will automatically refresh analytics, but we can also call it manually for consistency
-    supabase_connect.rpc('refresh_submission_analytics', {
-      p_submission_id: design.id
-    }).then(() => {
-      console.log(`✓ Analytics refreshed for submission ${design.id}`);
-    }).catch(err => {
-      console.error("Analytics refresh error:", err);
-    });
-
-    res.json({ 
-      success: true, 
-      sessionId,
-      isNewView: true,
-      isFirstViewFromFingerprint: isFirstViewFromFingerprint
-    });
-
+    return res.json({ success: true, sessionId, isUniqueViewer });
   } catch (err) {
-    console.error("Session start error:", err);
-    res.status(500).json({ error: "Failed to start session" });
+    console.error("start-session error:", err);
+    return res.status(500).json({ error: "Server error", details: err.message });
   }
 });
-// Endpoint: Update session activity (time spent, pages viewed)
-router.post('/:uniqueId/update-session', async (req, res) => {
+
+/**
+ * POST /:uniqueId/update-session
+ * updates time spent/pages viewed for a given sessionId
+ */
+router.post("/:uniqueId/update-session", async (req, res) => {
   try {
-    const { uniqueId } = req.params;
     const { sessionId, timeSpent, pagesViewed, maxPageViewed } = req.body;
-
-    if (!sessionId) {
+    if (!sessionId)
       return res.status(400).json({ error: "Missing session ID" });
-    }
 
-    // Determine if engaged (>30 seconds OR viewed >2 pages)
-    const engaged = timeSpent >= 30 || pagesViewed >= 3;
+    const engaged =
+      (timeSpent || 0) >= 30 || (pagesViewed || 0) >= 3;
 
     const { error } = await supabase_connect
       .from("submission_views")
       .update({
         last_activity_at: new Date().toISOString(),
-        time_spent_seconds: timeSpent,
-        pages_viewed: pagesViewed,
-        max_pages_viewed: maxPageViewed || pagesViewed,
-        engaged: engaged
+        time_spent_seconds: timeSpent || 0,
+        pages_viewed: pagesViewed || 1,
+        max_pages_viewed: maxPageViewed || pagesViewed || 1,
+        engaged,
       })
-      .eq('session_id', sessionId);
+      .eq("session_id", sessionId);
 
     if (error) {
       console.error("Session update error:", error);
@@ -438,14 +149,14 @@ router.post('/:uniqueId/update-session', async (req, res) => {
     }
 
     res.json({ success: true });
-
   } catch (err) {
-    console.error("Session update error:", err);
-    res.status(500).json({ error: "Failed to update session" });
+    console.error("update-session error:", err);
+    res.status(500).json({ error: "Server error" });
   }
-})
+});
+
 // Endpoint: Get submission analytics
-router.get('/:uniqueId/analytics', async (req, res) => {
+router.get("/:uniqueId/analytics", async (req, res) => {
   try {
     const { uniqueId } = req.params;
 
@@ -453,7 +164,7 @@ router.get('/:uniqueId/analytics', async (req, res) => {
     const { data: design, error: designError } = await supabase_connect
       .from("design_submissions")
       .select("id, created_at")
-      .eq('unique_id', uniqueId)
+      .eq("unique_id", uniqueId)
       .single();
 
     if (designError || !design) {
@@ -464,16 +175,17 @@ router.get('/:uniqueId/analytics', async (req, res) => {
     const { data: analytics, error: analyticsError } = await supabase_connect
       .from("submission_analytics")
       .select("*")
-      .eq('submission_id', design.id)
+      .eq("submission_id", design.id)
       .single();
 
-    if (analyticsError && analyticsError.code !== 'PGRST116') {
+    if (analyticsError && analyticsError.code !== "PGRST116") {
       console.error("Analytics fetch error:", analyticsError);
     }
 
     // Calculate submission age in days
     const submissionAge = Math.floor(
-      (Date.now() - new Date(design.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      (Date.now() - new Date(design.created_at).getTime()) /
+        (1000 * 60 * 60 * 24)
     );
 
     res.json({
@@ -482,15 +194,14 @@ router.get('/:uniqueId/analytics', async (req, res) => {
         totalViews: analytics?.total_views || 0,
         uniqueViewers: analytics?.unique_viewers || 0,
         averageTimePerView: analytics?.avg_time_per_view_seconds || 0,
-        submissionAge: submissionAge,
+        submissionAge,
         firstViewedAt: analytics?.first_viewed_at || null,
         lastViewedAt: analytics?.last_viewed_at || null,
         engagementScore: analytics?.engagement_score || 0,
-        status: analytics?.first_viewed_at ? 'viewed' : 'pending',
-        averagePagesViewed: analytics?.avg_pages_viewed || 0
-      }
+        status: analytics?.first_viewed_at ? "viewed" : "pending",
+        averagePagesViewed: analytics?.avg_pages_viewed || 0,
+      },
     });
-
   } catch (err) {
     console.error("Analytics fetch error:", err);
     res.status(500).json({ error: "Failed to fetch analytics" });
@@ -498,7 +209,7 @@ router.get('/:uniqueId/analytics', async (req, res) => {
 });
 
 // Endpoint: Refresh expired signed URLs
-router.get('/:uniqueId/refresh-urls', async (req, res) => {
+router.get("/:uniqueId/refresh-urls", async (req, res) => {
   try {
     const { uniqueId } = req.params;
 
@@ -509,7 +220,7 @@ router.get('/:uniqueId/refresh-urls', async (req, res) => {
     const { data: design, error } = await supabase_connect
       .from("design_submissions")
       .select("*")
-      .eq('unique_id', uniqueId)
+      .eq("unique_id", uniqueId)
       .single();
 
     if (error || !design) {
@@ -517,56 +228,53 @@ router.get('/:uniqueId/refresh-urls', async (req, res) => {
     }
 
     let layers = [];
-    if (design.design_type === 'figma') {
+
+    if (design.design_type === "figma") {
       const { data: layersData, error: layersError } = await supabase_connect
         .from("design_layers")
         .select("*")
-        .eq('submission_id', design.id)
-        .order('layer_order', { ascending: true });
+        .eq("submission_id", design.id)
+        .order("layer_order", { ascending: true });
 
       if (!layersError && layersData && layersData.length > 0) {
         for (let layer of layersData) {
-          const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
+          const sanitizedLayerName = layer.layer_name.replace(
+            /[^a-zA-Z0-9]/g,
+            "_"
+          );
           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
-          
-          const { data: signedData, error: signedError } = await supabase_connect.storage
-            .from('design_previews')
-            .createSignedUrl(imagePath, 3600);
-          
+
+          const { data: signedData, error: signedError } =
+            await supabase_connect.storage
+              .from("design_previews")
+              .createSignedUrl(imagePath, 3600);
+
           if (!signedError && signedData && signedData.signedUrl) {
             layer.layer_preview_url = signedData.signedUrl;
           } else {
             layer.layer_preview_url = null;
           }
         }
-        
-        layers = layersData.map(layer => ({
-          layer_name: layer.layer_name || 'Untitled',
+
+        layers = layersData.map((layer) => ({
+          layer_name: layer.layer_name || "Untitled",
           layer_order: layer.layer_order,
-          layer_preview_url: layer.layer_preview_url || null
+          layer_preview_url: layer.layer_preview_url || null,
         }));
       }
     }
 
-    res.json({ 
-      success: true, 
-      layers,
-      expiresIn: 3600 
-    });
-
+    res.json({ success: true, layers, expiresIn: 3600 });
   } catch (err) {
     console.error("URL refresh error:", err);
-    res.status(500).json({ 
-      error: "Failed to refresh URLs",
-      details: err.message 
-    });
+    res
+      .status(500)
+      .json({ error: "Failed to refresh URLs", details: err.message });
   }
 });
 
 // Main preview route
-// ... (keep all your existing imports and helper functions)
-
-router.get('/:uniqueId', async (req, res) => {
+router.get("/:uniqueId", async (req, res) => {
   try {
     const { uniqueId } = req.params;
 
@@ -577,119 +285,194 @@ router.get('/:uniqueId', async (req, res) => {
     const { data: design, error } = await supabase_connect
       .from("design_submissions")
       .select("*")
-      .eq('unique_id', uniqueId)
+      .eq("unique_id", uniqueId)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if (error.code === "PGRST116") {
         return res.status(404).json({ error: "Design not found" });
       }
       console.error("Fetch error:", error.message);
       return res.status(500).json({ error: error.message });
     }
 
-   if (!design) {
-  return res.status(404).json({ error: "Design not found" });
-}
+    if (!design) {
+      return res.status(404).json({ error: "Design not found" });
+    }
 
-//  ADD THIS BLOCK HERE (DO NOT REMOVE ANY EXISTING CODE)
-try {
-  const { error: updateError } = await supabase_connect
-    .from("design_submissions")
-    .update({
-      last_viewed_at: new Date().toISOString(),
-      status:'viewed'
-    })
-    .eq('id', design.id);
+    // Update last_viewed_at and status
+    try {
+      const { error: updateError } = await supabase_connect
+        .from("design_submissions")
+        .update({
+          last_viewed_at: new Date().toISOString(),
+          status: "viewed",
+        })
+        .eq("id", design.id);
 
-  if (updateError) {
-    console.error(" Failed to update last_viewed_at:", updateError);
-  } else {
-    console.log(" last_viewed_at updated for preview:", uniqueId);
-  }
-} catch (err) {
-  console.error(" Error updating last_viewed_at:", err);
-}
+      if (updateError) {
+        console.error("Failed to update last_viewed_at:", updateError);
+      } else {
+        console.log("last_viewed_at updated for preview:", uniqueId);
+      }
+    } catch (err) {
+      console.error("Error updating last_viewed_at:", err);
+    }
 
     // Fetch layers if Figma design
     let layers = [];
-    if (design.design_type === 'figma') {
+
+    if (design.design_type === "figma") {
       const { data: layersData, error: layersError } = await supabase_connect
         .from("design_layers")
         .select("*")
-        .eq('submission_id', design.id)
-        .order('layer_order', { ascending: true });
+        .eq("submission_id", design.id)
+        .order("layer_order", { ascending: true });
 
       if (!layersError && layersData && layersData.length > 0) {
         for (let layer of layersData) {
-          const sanitizedLayerName = layer.layer_name.replace(/[^a-zA-Z0-9]/g, '_');
+          const sanitizedLayerName = layer.layer_name.replace(
+            /[^a-zA-Z0-9]/g,
+            "_"
+          );
           const imagePath = `${design.user_id}/${design.id}/${sanitizedLayerName}_${layer.layer_order}.png`;
-          
-          const { data: signedData, error: signedError } = await supabase_connect.storage
-            .from('design_previews')
-            .createSignedUrl(imagePath, 3600);
-          
+
+          const { data: signedData, error: signedError } =
+            await supabase_connect.storage
+              .from("design_previews")
+              .createSignedUrl(imagePath, 3600);
+
           if (!signedError && signedData && signedData.signedUrl) {
             layer.layer_preview_url = signedData.signedUrl;
           } else {
-            console.error(`Could not fetch preview for layer: ${imagePath}`, signedError);
+            console.error(
+              `Could not fetch preview for layer: ${imagePath}`,
+              signedError
+            );
             layer.layer_preview_url = null;
           }
         }
-        
+
         layers = layersData;
       }
     }
 
-    const loadingDuration = layers.length > 8 ? 19000 : (layers.length > 0 ? 10000 : 15000);
+    const loadingDuration =
+      layers.length > 8 ? 19000 : layers.length > 0 ? 10000 : 15000;
 
     // Generate signed URL for main preview thumbnail
     let previewImageUrl = null;
     if (design.preview_thumbnail) {
-      const { data: signedData, error: signedError } = await supabase_connect.storage
-        .from('design_previews')
-        .createSignedUrl(design.preview_thumbnail, 3600);
-      
+      const { data: signedData, error: signedError } =
+        await supabase_connect.storage
+          .from("design_previews")
+          .createSignedUrl(design.preview_thumbnail, 3600);
+
       if (!signedError && signedData && signedData.signedUrl) {
         previewImageUrl = signedData.signedUrl;
       }
     }
+
     let fullViewUrl = null;
-    if (design.design_type === 'pdf') {
+    if (design.design_type === "pdf") {
       const { data, error: signedUrlError } = await supabase_connect.storage
-        .from('design_files')
+        .from("design_files")
         .createSignedUrl(design.pdf_file_path, 3600);
-      
+
       if (signedUrlError) {
         console.error("Signed URL error:", signedUrlError);
         return res.status(500).json({ error: "Failed to generate PDF URL" });
       }
-      
-      fullViewUrl = data.signedUrl + '#toolbar=0&navpanes=0&scrollbar=0';
+      fullViewUrl = `${data.signedUrl}#toolbar=0&navpanes=0&scrollbar=0`;
     }
 
     // Get default layer preview URL
     let defaultLayerUrl = null;
-    if (design.design_type === 'figma' && layers.length > 0 && layers[0].layer_preview_url) {
+    if (
+      design.design_type === "figma" &&
+      layers.length > 0 &&
+      layers[0].layer_preview_url
+    ) {
       defaultLayerUrl = layers[0].layer_preview_url;
     }
 
-    const layersJSON = JSON.stringify(layers.map(layer => ({
-      layer_name: layer.layer_name || 'Untitled',
-      layer_order: layer.layer_order,
-      layer_preview_url: layer.layer_preview_url || null
-    })));
+    const layersJSON = JSON.stringify(
+      layers.map((layer) => ({
+        layer_name: layer.layer_name || "Untitled",
+        layer_order: layer.layer_order,
+        layer_preview_url: layer.layer_preview_url || null,
+      }))
+    );
 
     const totalLayers = layers.length;
 
-    const html = `
-<!DOCTYPE html>
+    const dropdownHtml =
+      design.design_type === "figma" && layers.length > 0
+        ? `
+            <div class="custom-dropdown" id="customDropdown">
+              <div class="dropdown-trigger" id="dropdownTrigger">
+                <div class="dropdown-label">
+                  <span class="dropdown-label-prefix">Page:</span>
+                  <span id="selectedOption">${
+                    layers[0].layer_name || "Page 1"
+                  }</span>
+                </div>
+                <svg class="dropdown-chevron" id="dropdownChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 9l6 6 6-6"></path>
+                </svg>
+              </div>
+              <div class="dropdown-menu" id="dropdownMenu">
+                ${layers
+                  .map(
+                    (layer, idx) => `
+                      <div class="dropdown-option ${
+                        idx === 0 ? "selected" : ""
+                      }" data-index="${idx}">
+                        ${layer.layer_name || `Page ${idx + 1}`}
+                      </div>`
+                  )
+                  .join("")}
+              </div>
+            </div>`
+        : `<div></div>`;
+
+    const previewInnerHtml =
+      design.design_type === "figma"
+        ? `
+          <div class="screenshot-container" id="screenshotContainer">
+            <div class="layer-loading-overlay" id="layerLoadingOverlay">
+              <div class="mini-spinner"></div>
+            </div>
+            ${
+              defaultLayerUrl
+                ? `<img src="${defaultLayerUrl}" alt="Design Preview" class="preview-image loading" id="previewImage">`
+                : `<div class="error-message">No preview available for this design.</div>`
+            }
+          </div>`
+        : `
+          <div class="iframe-container" id="iframeContainer">
+            <div class="loading-overlay" id="loadingOverlay">
+              <div class="spinner"></div>
+              <div class="loading-text-small">Loading PDF...</div>
+            </div>
+            <iframe id="designFrame" class="design-frame" src="${fullViewUrl}"></iframe>
+          </div>`;
+
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${design.position} - ${design.company_name}</title>
-  
+  <script>
+    // Load FingerprintJS and create global getter
+    async function loadFingerprint() {
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
+      return result.visitorId;
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
   <style>
     @font-face {
       font-family: 'Circular Std';
@@ -719,101 +502,158 @@ try {
       font-style: normal;
       font-display: swap;
     }
-
-    * { 
-      margin: 0; 
-      padding: 0; 
-      box-sizing: border-box; 
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
       font-family: 'Circular Std', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
     }
-    
-    body { 
-      background: #FFFFFF; 
-      min-height: 100vh; 
-      color: #111827; 
+    body {
+      background: #FFFFFF;
+      min-height: 100vh;
+      color: #111827;
     }
-    .loading-screen { position: fixed; inset: 0; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
-    .loading-screen.fade-out { opacity: 0; pointer-events: none; }
-    .loading-logo { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 24px; letter-spacing: -0.5px; }
-    .loading-spinner { width: 48px; height: 48px; border: 4px solid #E5E7EB; border-top: 4px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
-    .loading-text { color: #6B7280; font-size: 15px; font-weight: 500; margin-bottom: 8px; }
-    .loading-subtext { color: #9CA3AF; font-size: 13px; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    .main-content { opacity: 0; transition: opacity 0.5s ease; }
-    .main-content.visible { opacity: 1; }
-
-    .navbar { background: #FFFFFF; padding: 20px 0; border-bottom: 2px solid #E5E7EB; }
-    .nav-content { max-width: 1400px; margin: 0 auto; padding: 0 32px; }
-    .nav-title { font-size: 22px; font-weight: 600; color: #111827; margin-bottom: 6px; }
-    .nav-meta { font-size: 16px; color: #6B7280; }
-
-    .page-container { max-width: 1400px; margin: 0 auto; padding: 0 32px 24px 32px; display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
-
-    .content-area { background: #F9FAFB; border-radius: 0; padding: 24px 20px 20px 20px; min-height: 600px; position: relative; }
-
-    .custom-dropdown { 
-      position: relative; 
+    .loading-screen {
+      position: fixed;
+      inset: 0;
+      background: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+    .loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loading-logo {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+    }
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #E5E7EB;
+      border-top: 4px solid #3B82F6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    .loading-text {
+      color: #6B7280;
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .loading-subtext {
+      color: #9CA3AF;
+      font-size: 13px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .main-content {
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .main-content.visible {
+      opacity: 1;
+    }
+    .navbar {
+      background: #FFFFFF;
+      padding: 20px 0;
+      border-bottom: 2px solid #E5E7EB;
+    }
+    .nav-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+    .nav-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 6px;
+    }
+    .nav-meta {
+      font-size: 16px;
+      color: #6B7280;
+    }
+    .page-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 32px 24px 32px;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 24px;
+      align-items: start;
+    }
+    .content-area {
+      background: #F9FAFB;
+      border-radius: 0;
+      padding: 24px 20px 20px 20px;
+      min-height: 600px;
+      position: relative;
+    }
+    .custom-dropdown {
+      position: relative;
       width: 210px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
-
-    .dropdown-trigger { 
-      width: 100%; 
-      padding: 10px 14px; 
-      border: 1px solid #E5E7EB; 
-      border-radius: 6px; 
-      background-color: #FFFFFF; 
-      font-size: 12px; 
-      font-weight: 500; 
-      color: #1A1A1A; 
-      cursor: pointer; 
+    .dropdown-trigger {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #E5E7EB;
+      border-radius: 6px;
+      background-color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1A1A1A;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
       transition: all 0.2s ease;
       user-select: none;
     }
-
-    .dropdown-trigger:hover { 
-      background-color: #FAFAFA; 
-      border-color: #D1D5DB; 
+    .dropdown-trigger:hover {
+      background-color: #FAFAFA;
+      border-color: #D1D5DB;
     }
-
-    .dropdown-trigger.open { 
-      border-color: #3972EA; 
-      box-shadow: 0 0 0 3px rgba(57, 114, 234, 0.1); 
+    .dropdown-trigger.open {
+      border-color: #3972EA;
+      box-shadow: 0 0 0 3px rgba(57, 114, 234, 0.1);
     }
-
     .dropdown-trigger.disabled {
       opacity: 0.5;
       cursor: not-allowed;
       pointer-events: none;
     }
-
     .dropdown-label {
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
     .dropdown-label-prefix {
       color: #6B7280;
       font-size: 12px;
       font-weight: 400;
     }
-
     .dropdown-chevron {
       width: 16px;
       height: 16px;
       color: #6B7280;
       transition: transform 0.2s ease;
     }
-
     .dropdown-chevron.rotate {
       transform: rotate(180deg);
     }
-
     .dropdown-menu {
       position: absolute;
       top: calc(100% + 6px);
@@ -830,11 +670,9 @@ try {
       display: none;
       animation: fadeIn 0.15s ease;
     }
-
     .dropdown-menu.show {
       display: block;
     }
-
     .dropdown-option {
       padding: 10px 14px;
       font-size: 14px;
@@ -843,50 +681,66 @@ try {
       cursor: pointer;
       transition: background-color 0.15s ease;
     }
-
     .dropdown-option:hover {
       background-color: #F5F6F8;
     }
-
     .dropdown-option.selected {
       background-color: #F5F6F8;
       font-weight: 500;
     }
-
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-4px); }
       to { opacity: 1; transform: translateY(0); }
     }
-
-    .preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
-    .preview-controls { display: flex; gap: 8px; align-items: center; }
-
-    .expand-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid #E5E7EB; background: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
-    .expand-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
-
-    .preview-area { 
-      background: #FFFFFF; 
-      border-radius: 20px; 
-      overflow: hidden; 
-      min-height: 600px; 
-      position: relative; 
-      display: flex; 
-      align-items: center; 
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+    .preview-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .expand-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid #E5E7EB;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .expand-btn:hover {
+      background: #F9FAFB;
+      border-color: #D1D5DB;
+    }
+    .preview-area {
+      background: #FFFFFF;
+      border-radius: 20px;
+      overflow: hidden;
+      min-height: 600px;
+      position: relative;
+      display: flex;
+      align-items: center;
       justify-content: center;
       padding: 20px;
     }
-
-    .screenshot-container { 
-      width: 100%; 
-      height: 100%; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
+    .screenshot-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       position: relative;
       min-height: 600px;
     }
-
-    .preview-image { 
+    .preview-image {
       max-width: 100%;
       max-height: 700px;
       width: auto;
@@ -896,40 +750,74 @@ try {
       transition: opacity 0.3s ease;
       margin: auto;
     }
-
-    .preview-image.loading { 
-      opacity: 0.3; 
+    .preview-image.loading {
+      opacity: 0.3;
     }
-
-    .layer-loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: none; align-items: center; justify-content: center; z-index: 5; }
-    .layer-loading-overlay.show { display: flex; }
-    .mini-spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
-
-    .iframe-container { 
-      width: 100%; 
+    .layer-loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+    }
+    .layer-loading-overlay.show {
+      display: flex;
+    }
+    .mini-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #E5E7EB;
+      border-top: 3px solid #3B82F6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .iframe-container {
+      width: 100%;
       max-width: 95%;
-      height: 100%; 
+      height: 100%;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 600px;
     }
-
-    .design-frame { 
-      width: 100%; 
-      height: 600px; 
-      border: none; 
+    .design-frame {
+      width: 100%;
+      height: 600px;
+      border: none;
       display: block;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border-radius: 8px;
     }
-
-    .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-    .loading-overlay.hidden { display: none; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top: 3px solid #3B82F6; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    .loading-text-small { margin-top: 12px; color: #6B7280; font-size: 14px; font-weight: 500; }
-
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.98);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .loading-overlay.hidden {
+      display: none;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #E5E7EB;
+      border-top: 3px solid #3B82F6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .loading-text-small {
+      margin-top: 12px;
+      color: #6B7280;
+      font-size: 14px;
+      font-weight: 500;
+    }
     .error-message {
       padding: 16px;
       background: #FEE2E2;
@@ -939,49 +827,118 @@ try {
       font-size: 14px;
       text-align: center;
     }
-
     .preview-area:fullscreen {
       background: #F9FAFB;
       padding: 40px;
     }
-
     .preview-area:fullscreen .preview-image {
       max-height: 90vh;
       max-width: 90vw;
     }
-
     .preview-area:fullscreen .design-frame {
       height: 90vh;
       max-width: 90vw;
     }
-
-    .info-column { display: flex; flex-direction: column; gap: 16px; padding-top: 24px; }
-    .info-panel.usage-terms { background: #FFFFFF; border-radius: 10px; overflow: hidden; border: 1px solid #FDE68A; }
-    .info-panel.usage-terms h3 { font-size: 16px; font-weight: 600; color: #92400E; background: #FFFBEB; padding: 14px 16px; margin: 0; border-bottom: 1px solid #FDE68A; }
-    .info-panel.usage-terms ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
-    .info-panel.usage-terms li { margin-bottom: 6px; }
-
-    .info-panel.documentation { background: #FFFFFF; border-radius: 10px; overflow: hidden; border: 1px solid #BFDBFE; }
-    .info-panel.documentation h3 { font-size: 16px; font-weight: 600; color: #1E40AF; background: #EFF6FF; padding: 14px 16px; margin: 0; border-bottom: 1px solid #BFDBFE; }
-    .info-panel.documentation ul { margin-left: 18px; color: #374151; font-size: 13px; line-height: 1.7; padding: 16px; }
-    .info-panel.documentation li { margin-bottom: 6px; }
-
-    @media (max-width: 1100px) {
-      .page-container { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
-      .design-frame { height: 500px; }
-      .info-column { flex-direction: row; gap: 16px; }
-      .info-panel { flex: 1; }
+    .info-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-top: 24px;
     }
-
+    .info-panel.usage-terms {
+      background: #FFFFFF;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #FDE68A;
+    }
+    .info-panel.usage-terms h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #92400E;
+      background: #FFFBEB;
+      padding: 14px 16px;
+      margin: 0;
+      border-bottom: 1px solid #FDE68A;
+    }
+    .info-panel.usage-terms ul {
+      margin-left: 18px;
+      color: #374151;
+      font-size: 13px;
+      line-height: 1.7;
+      padding: 16px;
+    }
+    .info-panel.usage-terms li {
+      margin-bottom: 6px;
+    }
+    .info-panel.documentation {
+      background: #FFFFFF;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #BFDBFE;
+    }
+    .info-panel.documentation h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1E40AF;
+      background: #EFF6FF;
+      padding: 14px 16px;
+      margin: 0;
+      border-bottom: 1px solid #BFDBFE;
+    }
+    .info-panel.documentation ul {
+      margin-left: 18px;
+      color: #374151;
+      font-size: 13px;
+      line-height: 1.7;
+      padding: 16px;
+    }
+    .info-panel.documentation li {
+      margin-bottom: 6px;
+    }
+    @media (max-width: 1100px) {
+      .page-container {
+        grid-template-columns: 1fr;
+        padding: 20px;
+        gap: 20px;
+      }
+      .design-frame {
+        height: 500px;
+      }
+      .info-column {
+        flex-direction: row;
+        gap: 16px;
+      }
+      .info-panel {
+        flex: 1;
+      }
+    }
     @media (max-width: 768px) {
-      .page-container { padding: 16px; }
-      .navbar { padding: 16px 0; }
-      .nav-content { padding: 0 20px; }
-      .nav-title { font-size: 18px; }
-      .nav-meta { font-size: 14px; }
-      .preview-header { flex-direction: column; align-items: flex-start; }
-      .preview-controls { width: 100%; justify-content: flex-end; }
-      .info-column { flex-direction: column; }
+      .page-container {
+        padding: 16px;
+      }
+      .navbar {
+        padding: 16px 0;
+      }
+      .nav-content {
+        padding: 0 20px;
+      }
+      .nav-title {
+        font-size: 18px;
+      }
+      .nav-meta {
+        font-size: 14px;
+      }
+      .preview-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .preview-controls {
+        width: 100%;
+        justify-content: flex-end;
+      }
+      .info-column {
+        flex-direction: column;
+      }
       .preview-area {
         min-height: 400px;
         padding: 15px;
@@ -992,11 +949,15 @@ try {
       .preview-image {
         max-height: 500px;
       }
-      .design-frame { 
-        height: 450px; 
+      .design-frame {
+        height: 450px;
       }
-      .loading-logo { font-size: 24px; }
-      .custom-dropdown { width: 100%; }
+      .loading-logo {
+        font-size: 24px;
+      }
+      .custom-dropdown {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -1005,74 +966,42 @@ try {
     <div class="loading-logo">The BYND</div>
     <div class="loading-spinner"></div>
     <div class="loading-text">Loading design submission...</div>
-    <div class="loading-subtext">Preparing ${layers.length > 0 ? layers.length + ' pages' : 'your preview'}</div>
+    <div class="loading-subtext">Preparing ${
+      layers.length > 0 ? `${layers.length} pages` : "your preview"
+    }</div>
   </div>
-
   <div class="main-content" id="mainContent">
     <div class="navbar">
       <div class="nav-content">
         <div class="nav-title">${design.position}</div>
-        <div class="nav-meta">${design.company_name} • Submitted on ${new Date(design.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</div>
+        <div class="nav-meta">${design.company_name} • Submitted on ${new Date(
+          design.created_at
+        ).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })}</div>
       </div>
     </div>
-
     <div class="page-container">
       <div class="content-area">
         <div class="preview-header">
-          ${design.design_type === 'figma' && layers.length > 0 ? `
-          <div class="custom-dropdown" id="customDropdown">
-            <div class="dropdown-trigger" id="dropdownTrigger">
-              <div class="dropdown-label">
-                <span class="dropdown-label-prefix">Page:</span>
-                <span id="selectedOption">${layers[0].layer_name || 'Page 1'}</span>
-              </div>
-              <svg class="dropdown-chevron" id="dropdownChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M6 9l6 6 6-6"/>
-              </svg>
-            </div>
-            <div class="dropdown-menu" id="dropdownMenu">
-              ${layers.map((layer, idx) => `
-                <div class="dropdown-option ${idx === 0 ? 'selected' : ''}" data-index="${idx}">
-                  ${layer.layer_name || `Page ${idx + 1}`}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-          ` : '<div></div>'}
-          
+          ${dropdownHtml}
           <div class="preview-controls">
             <button class="expand-btn" onclick="toggleFullscreen()" title="Expand to fullscreen">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
               </svg>
             </button>
           </div>
         </div>
-
         <div class="preview-area" id="previewArea">
-          ${design.design_type === 'figma' ? `
-          <div class="screenshot-container" id="screenshotContainer">
-            <div class="layer-loading-overlay" id="layerLoadingOverlay">
-              <div class="mini-spinner"></div>
-            </div>
-            ${defaultLayerUrl ? `
-              <img src="${defaultLayerUrl}" alt="Design Preview" class="preview-image loading" id="previewImage">
-            ` : `
-              <div class="error-message">No preview available for this design.</div>
-            `}
-          </div>
-          ` : `
-          <div class="iframe-container" id="iframeContainer">
-            <div class="loading-overlay" id="loadingOverlay">
-              <div class="spinner"></div>
-              <div class="loading-text-small">Loading PDF...</div>
-            </div>
-            <iframe id="designFrame" class="design-frame" src="${fullViewUrl}"></iframe>
-          </div>
-          `}
+          ${previewInnerHtml}
         </div>
       </div>
-
       <div class="info-column">
         <div class="info-panel usage-terms">
           <h3>Usage Terms</h3>
@@ -1082,7 +1011,6 @@ try {
             <li>Redistribution, duplication, or reuse is discouraged and may be subject to follow-up.</li>
           </ul>
         </div>
-
         <div class="info-panel documentation">
           <h3>Documentation Notice</h3>
           <ul>
@@ -1094,13 +1022,12 @@ try {
       </div>
     </div>
   </div>
-
   <script>
     // ========================================
     // ANALYTICS TRACKING - CONSOLIDATED
     // ========================================
     console.log('🔧 Analytics script loaded');
-    
+
     // Analytics variables
     let sessionId = null;
     let startTime = Date.now();
@@ -1111,29 +1038,25 @@ try {
 
     // Initialize session
     async function initSession() {
-      console.log(' Initializing analytics session...');
+      console.log("Initialising Fingerprint...");
+      const deviceFingerprint = await loadFingerprint(); // Critical
+      console.log("Fingerprint:", deviceFingerprint);
       try {
         const response = await fetch('/BYNDLINK/view/${uniqueId}/start-session', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ deviceFingerprint })
         });
-        
-        console.log('📡 Session response status:', response.status);
-        
         const data = await response.json();
-        console.log('📊 Session data:', data);
-        
+        console.log("Session start response:", data);
         if (data.success) {
           sessionId = data.sessionId;
-          console.log('✓ Session initialized:', sessionId, data.isNewView ? '(new view)' : '(returning)');
-          
-          // Start periodic tracking
           startTracking();
-        } else {
-          console.error('❌ Session init failed:', data);
         }
       } catch (err) {
-        console.error('❌ Session init error:', err);
+        console.error("initSession error:", err);
       }
     }
 
@@ -1151,14 +1074,14 @@ try {
         console.warn('⚠️ No session ID, skipping update');
         return;
       }
-      
       const timeSpent = Math.floor((Date.now() - startTime) / 1000);
       console.log('📤 Updating session:', { timeSpent, currentPage, maxPageViewed });
-      
       try {
-const response = await fetch('/BYNDLINK/view/${uniqueId}/update-session', {
+        const response = await fetch('/BYNDLINK/view/${uniqueId}/update-session', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({
             sessionId: sessionId,
             timeSpent: timeSpent,
@@ -1166,7 +1089,6 @@ const response = await fetch('/BYNDLINK/view/${uniqueId}/update-session', {
             maxPageViewed: maxPageViewed
           })
         });
-        
         const data = await response.json();
         console.log('✓ Session updated:', data);
       } catch (err) {
@@ -1178,8 +1100,7 @@ const response = await fetch('/BYNDLINK/view/${uniqueId}/update-session', {
     function trackPageView(pageIndex) {
       currentPage = pageIndex + 1;
       maxPageViewed = Math.max(maxPageViewed, currentPage);
-      console.log(\`📄 Page viewed: \${currentPage}/\${totalLayers}\`);
-      
+      console.log('📄 Page viewed: ' + currentPage + '/' + totalLayers);
       // Immediately update session
       updateSession();
     }
@@ -1194,9 +1115,9 @@ const response = await fetch('/BYNDLINK/view/${uniqueId}/update-session', {
           pagesViewed: currentPage,
           maxPageViewed: maxPageViewed
         });
-        
         console.log('👋 Sending final beacon:', data);
-navigator.sendBeacon('/BYNDLINK/view/${uniqueId}/update-session',
+        navigator.sendBeacon(
+          '/BYNDLINK/view/${uniqueId}/update-session',
           new Blob([data], { type: 'application/json' })
         );
       }
@@ -1219,7 +1140,7 @@ navigator.sendBeacon('/BYNDLINK/view/${uniqueId}/update-session',
     let currentLayerIndex = 0;
     let isLayerSwitching = false;
     let isInitialized = false;
-    let urlsExpireAt = Date.now() + (3600 * 1000);
+    let urlsExpireAt = Date.now() + 3600 * 1000;
     const preloadedImages = new Map();
     let isRefreshingUrls = false;
 
@@ -1243,7 +1164,7 @@ navigator.sendBeacon('/BYNDLINK/view/${uniqueId}/update-session',
 
     function areUrlsExpired() {
       const fiveMinutes = 5 * 60 * 1000;
-      return Date.now() > (urlsExpireAt - fiveMinutes);
+      return Date.now() > urlsExpireAt - fiveMinutes;
     }
 
     async function refreshLayerUrls() {
@@ -1251,30 +1172,23 @@ navigator.sendBeacon('/BYNDLINK/view/${uniqueId}/update-session',
         console.log('Already refreshing URLs...');
         return false;
       }
-
       isRefreshingUrls = true;
       console.log('🔄 Refreshing expired URLs...');
-
       try {
-const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
-        
+        const response = await fetch('/BYNDLINK/view/' + uniqueId + '/refresh-urls');
         if (!response.ok) {
           throw new Error('Failed to refresh URLs');
         }
-
         const data = await response.json();
-        
         if (data.layers && Array.isArray(data.layers)) {
           data.layers.forEach((newLayer, idx) => {
             if (layers[idx] && newLayer.layer_preview_url) {
               layers[idx].layer_preview_url = newLayer.layer_preview_url;
             }
           });
-
           preloadedImages.clear();
-          urlsExpireAt = Date.now() + (3600 * 1000);
+          urlsExpireAt = Date.now() + 3600 * 1000;
           preloadAllLayers();
-
           console.log('✓ URLs refreshed successfully');
           isRefreshingUrls = false;
           return true;
@@ -1290,22 +1204,20 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
 
     function preloadAllLayers() {
       if (designType !== 'figma' || layers.length === 0) return;
-      
       console.log('Starting preload of', layers.length, 'layers...');
-      
       layers.forEach((layer, idx) => {
         if (layer && layer.layer_preview_url) {
           const img = new Image();
           img.onload = () => {
             preloadedImages.set(idx, img);
-            console.log(\`✓ Preloaded layer \${idx}: \${layer.layer_name}\`);
+            console.log('✓ Preloaded layer ' + idx + ': ' + layer.layer_name);
           };
           img.onerror = (e) => {
-            console.error(\`✗ Failed to preload layer \${idx}: \${layer.layer_name}\`, e);
+            console.error('✗ Failed to preload layer ' + idx + ': ' + layer.layer_name, e);
           };
           img.src = layer.layer_preview_url;
         } else {
-          console.warn(\`Layer \${idx} has no preview URL\`);
+          console.warn('Layer ' + idx + ' has no preview URL');
         }
       });
     }
@@ -1314,7 +1226,6 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
       dropdownTrigger.addEventListener('click', (e) => {
         e.stopPropagation();
         if (isLayerSwitching) return;
-        
         const isOpen = dropdownMenu.classList.contains('show');
         if (isOpen) {
           closeDropdown();
@@ -1324,7 +1235,7 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
       });
 
       const dropdownOptions = dropdownMenu.querySelectorAll('.dropdown-option');
-      dropdownOptions.forEach(option => {
+      dropdownOptions.forEach((option) => {
         option.addEventListener('click', (e) => {
           e.stopPropagation();
           const index = parseInt(option.getAttribute('data-index'));
@@ -1357,11 +1268,9 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
           closeDropdown();
           return;
         }
-
         if (selectedOption && layers[index]) {
-          selectedOption.textContent = layers[index].layer_name || \`Page \${index + 1}\`;
+          selectedOption.textContent = layers[index].layer_name || 'Page ' + (index + 1);
         }
-
         dropdownOptions.forEach((opt, idx) => {
           if (idx === index) {
             opt.classList.add('selected');
@@ -1369,7 +1278,6 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
             opt.classList.remove('selected');
           }
         });
-
         closeDropdown();
         switchLayer(index);
       }
@@ -1380,7 +1288,6 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
         console.log('Switch prevented:', { isLayerSwitching, layerIndex, currentLayerIndex });
         return;
       }
-      
       const layer = layers[layerIndex];
       if (!layer || !layer.layer_preview_url || !previewImage) {
         console.error('Cannot switch to layer:', layerIndex, layer);
@@ -1390,32 +1297,27 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
       if (areUrlsExpired()) {
         console.log('⏰ URLs expired, refreshing...');
         const refreshed = await refreshLayerUrls();
-        
         if (!refreshed) {
           alert('Preview links have expired. Please refresh the page.');
           return;
         }
       }
 
-      console.log(\`Switching from layer \${currentLayerIndex} to \${layerIndex}\`);
+      console.log('Switching from layer ' + currentLayerIndex + ' to ' + layerIndex);
       isLayerSwitching = true;
 
       if (dropdownTrigger) {
         dropdownTrigger.classList.add('disabled');
       }
-
       if (layerLoadingOverlay) {
         layerLoadingOverlay.classList.add('show');
       }
-
       previewImage.classList.add('loading');
 
       if (preloadedImages.has(layerIndex)) {
         const cachedImg = preloadedImages.get(layerIndex);
-        
         if (cachedImg.complete && cachedImg.naturalHeight > 0) {
           previewImage.src = cachedImg.src;
-          
           setTimeout(() => {
             previewImage.classList.remove('loading');
             if (layerLoadingOverlay) {
@@ -1426,8 +1328,7 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
             }
             isLayerSwitching = false;
             currentLayerIndex = layerIndex;
-            console.log(\`✓ Switched to layer \${layerIndex} (from cache)\`);
-            
+            console.log('✓ Switched to layer ' + layerIndex + ' (from cache)');
             // Track page view for analytics
             trackPageView(layerIndex);
           }, 150);
@@ -1442,12 +1343,11 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
         console.error('Image load timeout for layer', layerIndex);
         img.onerror(new Error('Timeout'));
       }, 10000);
-      
+
       img.onload = () => {
         clearTimeout(timeoutId);
         previewImage.src = img.src;
         preloadedImages.set(layerIndex, img);
-        
         setTimeout(() => {
           previewImage.classList.remove('loading');
           if (layerLoadingOverlay) {
@@ -1458,8 +1358,7 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
           }
           isLayerSwitching = false;
           currentLayerIndex = layerIndex;
-          console.log(\`✓ Switched to layer \${layerIndex} (newly loaded)\`);
-          
+          console.log('✓ Switched to layer ' + layerIndex + ' (newly loaded)');
           // Track page view for analytics
           trackPageView(layerIndex);
         }, 150);
@@ -1467,14 +1366,13 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
 
       img.onerror = async (e) => {
         clearTimeout(timeoutId);
-        console.error(\`✗ Failed to load layer \${layerIndex}:\`, layer.layer_name, e);
-        
+        console.error('✗ Failed to load layer ' + layerIndex + ': ' + layer.layer_name, e);
+
         if (!areUrlsExpired()) {
           console.log('Image failed but URLs not expired, forcing refresh...');
         }
-        
+
         const refreshed = await refreshLayerUrls();
-        
         if (refreshed) {
           const retryImg = new Image();
           retryImg.onload = () => {
@@ -1489,7 +1387,7 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
             }
             isLayerSwitching = false;
             currentLayerIndex = layerIndex;
-            console.log(\`✓ Switched to layer \${layerIndex} (after refresh)\`);
+            console.log('✓ Switched to layer ' + layerIndex + ' (after refresh)');
             trackPageView(layerIndex);
           };
           retryImg.onerror = () => {
@@ -1501,7 +1399,7 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
               dropdownTrigger.classList.remove('disabled');
             }
             isLayerSwitching = false;
-            alert(\`Failed to load page: \${layer.layer_name}. Please refresh the page.\`);
+            alert('Failed to load page: ' + layer.layer_name + '. Please refresh the page.');
           };
           retryImg.src = layers[layerIndex].layer_preview_url;
         } else {
@@ -1513,7 +1411,7 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
             dropdownTrigger.classList.remove('disabled');
           }
           isLayerSwitching = false;
-          alert(\`Failed to load page: \${layer.layer_name}. Please refresh the page.\`);
+          alert('Failed to load page: ' + layer.layer_name + '. Please refresh the page.');
         }
       };
 
@@ -1522,7 +1420,9 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
 
     function toggleFullscreen() {
       if (!document.fullscreenElement) {
-        previewArea.requestFullscreen().catch(err => console.error('Fullscreen error:', err));
+        previewArea.requestFullscreen().catch((err) =>
+          console.error('Fullscreen error:', err)
+        );
       } else {
         document.exitFullscreen();
       }
@@ -1533,20 +1433,17 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
       console.log('Hiding loading screen...');
       loadingScreen.classList.add('fade-out');
       mainContent.classList.add('visible');
-      
       setTimeout(() => {
         loadingScreen.style.display = 'none';
         isInitialized = true;
         console.log('Page initialized');
-        
-        // CRITICAL: Initialize analytics AFTER page is ready
+        // Initialize analytics AFTER page is ready
         console.log('🎯 Starting analytics initialization...');
         initSession();
       }, 500);
 
       if (designType === 'figma' && layers.length > 0) {
         preloadAllLayers();
-        
         if (previewImage) {
           const firstImageLoaded = new Promise((resolve, reject) => {
             if (previewImage.complete && previewImage.naturalHeight > 0) {
@@ -1566,7 +1463,8 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
               console.error('✗ First image failed to load:', e);
               previewImage.classList.remove('loading');
               if (screenshotContainer) {
-                screenshotContainer.innerHTML = '<div class="error-message">Failed to load preview image. Please refresh the page.</div>';
+                screenshotContainer.innerHTML =
+                  '<div class="error-message">Failed to load preview image. Please refresh the page.</div>';
               }
             });
 
@@ -1582,7 +1480,6 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
 
     if (designType === 'pdf' && designFrame && loadingOverlay) {
       let pdfLoaded = false;
-      
       designFrame.onload = () => {
         if (!pdfLoaded) {
           pdfLoaded = true;
@@ -1590,7 +1487,6 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
           loadingOverlay.classList.add('hidden');
         }
       };
-
       setTimeout(() => {
         if (!pdfLoaded) {
           console.warn('PDF load timeout - hiding overlay');
@@ -1601,18 +1497,17 @@ const response = await fetch(\`/BYNDLINK/view/\${uniqueId}/refresh-urls\`);
     }
   </script>
 </body>
-</html>
-`;
+</html>`;
 
     res.send(html);
-
   } catch (err) {
     console.error("Server error:", err);
-    res.status(500).json({ 
-      error: "Server error occurred",
-      details: err.message 
-    });
+    res
+      .status(500)
+      .json({ error: "Server error occurred", details: err.message });
   }
 });
 
 export default router;
+
+
