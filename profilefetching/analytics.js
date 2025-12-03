@@ -123,21 +123,31 @@ router.get('/:uniqueId/dashboard-analytics', async (req, res) => {
       date,
       views
     }));    
-    let engagementScore = 0;
-    
-    if (analytics.engagement_score !== null && analytics.engagement_score !== undefined) {
-      // Use the database-calculated score (0-100 scale from weighted formula)
-      engagementScore = Math.round(analytics.engagement_score);
-      console.log('✓ Using database-calculated engagement score:', engagementScore);
-    } else {
-      // Fallback: If database function hasn't run yet, use simple calculation
-      const totalSessions = analytics.total_views || 0;
-      const engagedSessions = engagementBreakdown.high + engagementBreakdown.moderate;
-      engagementScore = totalSessions > 0 
-        ? Math.round((engagedSessions / totalSessions) * 100) 
-        : 0;
-      console.warn('⚠️ Using fallback engagement calculation:', engagementScore);
-    }
+ let engagementScore = 0;
+
+// 1. Use DB score if available
+if (analytics.engagement_score !== null && analytics.engagement_score !== undefined) {
+  engagementScore = Math.round(analytics.engagement_score);
+}
+
+// 2. OR use alternate DB column (if named differently)
+else if (analytics.engagementScore !== null && analytics.engagementScore !== undefined) {
+  engagementScore = Math.round(analytics.engagementScore);
+}
+
+// 3. Otherwise fallback (low + moderate + high all count as engagement)
+else {
+  const total = analytics.total_views || 0;
+  const engaged =
+    engagementBreakdown.high +
+    engagementBreakdown.moderate +
+    engagementBreakdown.low;   
+
+  engagementScore = total > 0 
+    ? Math.round((engaged / total) * 100)
+    : 0;
+}
+
 
     // Return formatted analytics data
 // In your backend getanalytics route - around the response section

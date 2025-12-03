@@ -353,8 +353,6 @@ async function generatePdfPreview(pdfPath, userId, submissionId) {
     if (browser) await browser.close();
   }
 }
-
-// === Main route (unchanged structure) ===
 router.post("", upload.single("pdf_file"), async (req, res) => {
   try {
     const {

@@ -14,6 +14,7 @@ import getstats from "./analytics/userstats.js";
 import Delete from "./designdetials/deletedesign.js";
 import Currentplan from "./subscriptions/currentplan.js"
 import DashboardAnalytics from "./profilefetching/analytics.js"
+import DesignPreviewRoute from "./previewsection/designpreview.js"
 const app = express();
 
 // 1. Basic middleware first
@@ -55,6 +56,8 @@ app.use('/userurls', getstats);
 app.use('/submissions', Delete);
 app.use("/userplan", Currentplan);
 app.use('/getanalytics', DashboardAnalytics);
+app.use("/api/preview", DesignPreviewRoute);
+
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`Server started on port ${port}`);
