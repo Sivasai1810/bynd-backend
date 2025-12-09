@@ -646,7 +646,7 @@ async function generatePdfPreview(pdfPath, userId, submissionId) {
 }
 
 // route: accepts multiple files as "pdf_files"
-router.post("", upload.array("pdf_files"), async (req, res) => {
+router.post("", upload.array("pdf_files",30), async (req, res) => {
   try {
     const {
       user_id,
