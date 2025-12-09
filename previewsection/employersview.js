@@ -1,0 +1,81 @@
+import express from "express";
+import { supabase_connect } from "../supabase/set-up.js";
+
+const router = express.Router();
+
+router.get("/:uniqueId", async (req, res) => {
+  try {
+    const { uniqueId } = req.params;
+
+    const { data: design, error } = await supabase_connect
+      .from("design_submissions")
+      .select("*")
+      .eq("unique_id", uniqueId)
+      .single();
+
+    if (error || !design) {
+      return res.status(404).json({ error: "Design not found" });
+    }
+    let layers = [];
+    if (design.design_type === "figma") {
+      const { data: layerRows } = await supabase_connect
+        .from("design_layers")
+        .select("*")
+        .eq("submission_id", design.id)
+        .order("layer_order", { ascending: true });
+
+      for (let l of layerRows) {
+        const cleanName = l.layer_name.replace(/[^a-zA-Z0-9]/g, "_");
+        const path = `${design.user_id}/${design.id}/${cleanName}_${l.layer_order}.png`;
+
+        const { data: signed } = await supabase_connect.storage
+          .from("design_previews")
+          .createSignedUrl(path, 3600);
+
+        layers.push({
+          name: l.layer_name,
+          order: l.layer_order,
+          url: signed?.signedUrl || null,
+        });
+      }
+    }
+
+    // Thumbnail
+    let previewThumb = null;
+    if (design.preview_thumbnail) {
+      const { data: signed } = await supabase_connect.storage
+        .from("design_previews")
+        .createSignedUrl(design.preview_thumbnail, 3600);
+      previewThumb = signed?.signedUrl || null;
+    }
+
+    // PDF
+  let pdfUrl = null;
+
+if (design.design_type === "pdf") {
+  const { data: signed } = await supabase_connect.storage
+    .from("design_files")
+    .createSignedUrl(design.pdf_file_path, 3600);
+
+  if (signed?.signedUrl) {
+    // FINAL PDF URL WITH TOOLBAR, MENUS & NAV REMOVED
+    pdfUrl = `${signed.signedUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH`;
+  } else {
+    pdfUrl = null;
+  }
+}
+
+    res.json({
+      ok: true,
+      design,
+      previewThumb,
+      layers,
+      pdfUrl,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error", details: err.message });
+  }
+});
+
+export default router;

@@ -14,16 +14,15 @@ import getstats from "./analytics/userstats.js";
 import Delete from "./designdetials/deletedesign.js";
 import Currentplan from "./subscriptions/currentplan.js"
 import DashboardAnalytics from "./profilefetching/analytics.js"
-import DesignPreviewRoute from "./previewsection/designpreview.js"
-const app = express();
-
-// 1. Basic middleware first
+import EmployersviewRoute from "./previewsection/employersview.js"
+import DesignPreview from "./previewsection/designpreview.js"
+import AnalyticsRoutes from "./analytics/analyticsend.js"
+ const app = express();
 app.use(express.json());
 app.use(cookieParser());
-
-// 2. Static files
 app.use('/fonts', express.static('fonts'));
-
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" }));
 // 3. CORS configuration
 const allowedOrigins = [
   "http://localhost:3000",  // Fixed the space
@@ -31,10 +30,11 @@ const allowedOrigins = [
   "https://bynd-final.vercel.app" ,
   "https://bynd-backend.onrender.com"
 ];
+app.use(express.text());
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);  // Allow same-origin
+    if (!origin) return callback(null, true);                      
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -56,7 +56,9 @@ app.use('/userurls', getstats);
 app.use('/submissions', Delete);
 app.use("/userplan", Currentplan);
 app.use('/getanalytics', DashboardAnalytics);
-app.use("/api/preview", DesignPreviewRoute);
+app.use("/api/preview",EmployersviewRoute);
+app.use("/api/view",DesignPreview)
+app.use("/api/analytics", AnalyticsRoutes);
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
