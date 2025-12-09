@@ -17,7 +17,7 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
     const { data: submission, error: submissionError } =
       await supabase_connect
         .from("design_submissions")
-        .select("id, created_at, position, company_name")
+        .select("id, created_at,status, position, company_name")
         .eq("unique_id", uniqueId)
         .single();
 
@@ -96,7 +96,9 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
     res.json({
       success: true,
       data: {
-        status: stats.first_viewed_at ? "viewed" : "pending",
+        // status: stats.first_viewed_at ? "viewed" : "pending",
+        status: submission.status || "pending",
+
         totalViews: stats.total_views || 0,
         uniqueViewers: stats.unique_views || 0,
         avgTimePerView: stats.avg_time_spent || 0,

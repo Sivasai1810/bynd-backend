@@ -53,7 +53,7 @@ router.post("/track", async (req, res) => {
         submission_id: submissionId,
         total_views: 0,
         unique_views: 0,
-    
+
       });
   }
 
@@ -68,6 +68,26 @@ router.post("/track", async (req, res) => {
       total_views: (statsNow?.total_views || 0) + 1,
     })
     .eq("submission_id", submissionId);
+// ✅ GLOBAL FIRST VIEW (NOT DEVICE-DEPENDENT)
+const now = new Date().toISOString();
+
+// set first_viewed_at ONLY ONCE
+await supabase_connect
+  .from("submission_view_stats")
+  .update({
+    first_viewed_at: now,
+    last_viewed_at: now,
+  })
+  .is("first_viewed_at", null)
+  .eq("submission_id", submissionId);
+
+// always update last_viewed_at
+await supabase_connect
+  .from("submission_view_stats")
+  .update({
+    last_viewed_at: now,
+  })
+  .eq("submission_id", submissionId);
 
   const { data: rows } = await supabase_connect
     .from("submission_device_views")
