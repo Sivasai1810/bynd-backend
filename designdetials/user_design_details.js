@@ -524,7 +524,7 @@ const extractFigmaFileKey = (url) => {
   return match ? match[2] : null;
 };
 const generateShareableLink = (uniqueId) =>
-  `https://bynd-backend.onrender.com/BYNDLINK/view/${uniqueId}`;
+  `http://bynd-final.vercel.app/recruiterview/${uniqueId}`;
 const getCleanFigmaToken = () => {
   const token = process.env.FIGMA_ACCESS_TOKEN;
   if (!token) throw new Error("Missing FIGMA_ACCESS_TOKEN");
