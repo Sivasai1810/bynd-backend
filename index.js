@@ -83,10 +83,11 @@ import DashboardAnalytics from "./profilefetching/analytics.js";
 import EmployersviewRoute from "./previewsection/employersview.js";
 import DesignPreview from "./previewsection/designpreview.js";
 import AnalyticsRoutes from "./analytics/analyticsend.js";
-
+import Setnotifications from "./notification/setnotification.js"
+import Sentnotification from "./notification/sentnotification.js"
 const app = express();
 
-/* ✅ CORS FIRST */
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
@@ -106,18 +107,16 @@ app.use(cors({
   credentials: true,
 }));
 
-/* ✅ BASIC MIDDLEWARE */
+
 app.use(cookieParser());
 app.use('/fonts', express.static('fonts'));
 
-/* ✅ IMPORTANT: multer route BEFORE body parsers */
+
 app.use('/storeurls', designdetials);
 
-/* ✅ body parsers AFTER upload route */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ✅ OTHER ROUTES */
 app.use('/auth/signup', signup);
 app.use('/auth/login', login);
 app.use('/supabase/redirecturl', redirecturl);
@@ -131,9 +130,9 @@ app.use('/getanalytics', DashboardAnalytics);
 app.use("/api/preview", EmployersviewRoute);
 app.use("/api/view", DesignPreview);
 app.use("/api/analytics", AnalyticsRoutes);
-
-/* ✅ START SERVER */
+app.use("/sendnotification",Setnotifications)
+app.use("/fetchnotification",Sentnotification)
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`✅ Server started on port ${port}`);
+  console.log(`Server started on port ${port}`);
 });
