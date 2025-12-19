@@ -1,9 +1,17 @@
+import dotenv from 'dotenv'
+dotenv.config()
 import express from "express";
 import { supabase_connect } from "../supabase/set-up.js";
-
+import jwt from "jsonwebtoken";
+const jwtpassword=process.env.JSONWEBPASSWORD
 const router = express.Router();
-
-router.get("/", async (req, res) => {
+const verifyplantoken=()=>{
+  const token =req.cookies
+  if(!token){
+    
+  }
+}
+router.get("/", verifyplantoken,async (req, res) => {
   try {
     const userId = req.query.user_id;
 
@@ -141,7 +149,7 @@ function formatSubscription(sub) {
     );
     
   } else {
-    // console.log('❌ NO ACTIVE TRIAL OR SUBSCRIPTION');
+    // console.log(' NO ACTIVE TRIAL OR SUBSCRIPTION');
   }
 
   const result = {

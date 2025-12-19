@@ -1,12 +1,12 @@
 import express from "express";
-import { supabase_connect } from "../supabase/set-up.js";
+import { supabase_connect } from "../supabase/set-up.js"
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
     const { user_id } = req.query;
-   
+   console.log(user_id)
 
     const { data, error } = await supabase_connect
       .from("notifications")

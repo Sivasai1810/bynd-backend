@@ -15,7 +15,7 @@ function isSimilarDevice(a, b) {
   return score >= 50;
 }
 
-/* ✅ TRACK VIEW ROUTE (UNCHANGED) */
+/* TRACK VIEW ROUTE (UNCHANGED) */
 router.post("/track", async (req, res) => {
   const {
     submissionUniqueId,
@@ -27,7 +27,7 @@ router.post("/track", async (req, res) => {
     screen,
   } = req.body;
 
-  /* 1️⃣ Resolve submission */
+  /*  Resolve submission */
   const { data: submission } = await supabase_connect
     .from("design_submissions")
     .select("id")
@@ -68,7 +68,7 @@ router.post("/track", async (req, res) => {
       total_views: (statsNow?.total_views || 0) + 1,
     })
     .eq("submission_id", submissionId);
-// ✅ GLOBAL FIRST VIEW (NOT DEVICE-DEPENDENT)
+//  GLOBAL FIRST VIEW (NOT DEVICE-DEPENDENT)
 const now = new Date().toISOString();
 
 // set first_viewed_at ONLY ONCE
@@ -102,7 +102,7 @@ await supabase_connect
     return res.json({ unique: false });
   }
 
-  /* 4️⃣ Try to link browser to existing device */
+  /* Try to link browser to existing device */
   let matchedDeviceGroup = null;
 
   for (const row of rows) {
@@ -120,7 +120,7 @@ await supabase_connect
     }
   }
 
-  /* 5️⃣ New physical device */
+  /*  New physical device */
   let isUnique = false;
 
   if (!matchedDeviceGroup) {
@@ -135,7 +135,7 @@ await supabase_connect
       .eq("submission_id", submissionId);
   }
 
-  /* 6️⃣ Store browser visit */
+  /* Store browser visit */
   await supabase_connect
     .from("submission_device_views")
     .insert({
@@ -157,12 +157,12 @@ router.post("/time", async (req, res) => {
 
     let body = req.body;
 
-    // ✅ handle sendBeacon/text or fetch/json
+    //handle sendBeacon/text or fetch/json
     if (typeof body === "string") {
       try {
         body = JSON.parse(body);
       } catch {
-        console.log("[TIME] ❌ invalid JSON");
+        console.log("[TIME]  invalid JSON");
         return res.json({ ok: false });
       }
     }
@@ -171,22 +171,22 @@ router.post("/time", async (req, res) => {
 
     console.log("[TIME] parsed:", { submissionUniqueId, timeSpent });
 
-    // ✅ CORRECT validation (0 is allowed!)
+    //  CORRECT validation (0 is allowed!)
     if (
       typeof submissionUniqueId !== "string" ||
       typeof timeSpent !== "number"
     ) {
-      console.log("[TIME] ❌ invalid payload", body);
+      console.log("[TIME]  invalid payload", body);
       return res.json({ ok: false });
     }
 
-    // ✅ only block impossible values
+    // only block impossible values
     if (timeSpent < 0 || timeSpent > 6 * 60 * 60) {
       console.log("[TIME] ⏭ ignored unrealistic timeSpent:", timeSpent);
       return res.json({ ok: true, ignored: true });
     }
 
-    // ✅ resolve submission
+    //  resolve submission
     const { data: submission } = await supabase_connect
       .from("design_submissions")
       .select("id")
@@ -194,21 +194,21 @@ router.post("/time", async (req, res) => {
       .single();
 
     if (!submission) {
-      console.log("[TIME] ❌ submission not found:", submissionUniqueId);
+      console.log("[TIME]  submission not found:", submissionUniqueId);
       return res.status(404).json({ ok: false });
     }
 
     const submissionId = submission.id;
     const now = new Date().toISOString();
 
-    // ✅ fetch stats
+    //  fetch stats
     const { data: stat } = await supabase_connect
       .from("submission_view_stats")
       .select("*")
       .eq("submission_id", submissionId)
       .single();
 
-    // ✅ first time entry
+    //  first time entry
     if (!stat) {
       await supabase_connect
         .from("submission_view_stats")
@@ -221,11 +221,11 @@ router.post("/time", async (req, res) => {
           last_viewed_at: now,
         });
 
-      console.log("[TIME] ✅ stats created");
+      console.log("[TIME]  stats created");
       return res.json({ ok: true, created: true });
     }
 
-    // ✅ update existing
+    //update existing
     const total = (stat.total_time_spent || 0) + timeSpent;
     const sessions = (stat.sessions_count || 0) + 1;
 
@@ -240,7 +240,7 @@ router.post("/time", async (req, res) => {
       })
       .eq("submission_id", submissionId);
 
-    console.log("[TIME] ✅ stats updated");
+    console.log("[TIME] stats updated");
 
     res.json({ ok: true });
   } catch (err) {

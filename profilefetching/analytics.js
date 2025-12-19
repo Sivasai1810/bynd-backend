@@ -13,7 +13,7 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
       });
     }
 
-    /* 1️⃣ Resolve submission */
+    /* Resolve submission */
     const { data: submission, error: submissionError } =
       await supabase_connect
         .from("design_submissions")
@@ -28,7 +28,7 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
       });
     }
 
-    /* 2️⃣ Fetch analytics from submission_view_stats */
+    /* Fetch analytics from submission_view_stats */
     const { data: stats, error: statsError } =
       await supabase_connect
         .from("submission_view_stats")
@@ -42,7 +42,7 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
         (1000 * 60 * 60 * 24)
     );
 
-    /* 3️⃣ If no analytics yet */
+    /*  If no analytics yet */
     if (statsError || !stats) {
       return res.json({
         success: true,
@@ -78,7 +78,6 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
       else engagementBreakdown.low = totalSessions;
     }
 
-    /* 5️⃣ Engagement score */
     let engagementScore = 0;
 
     if (stats.engagement_score !== null && stats.engagement_score !== undefined) {
@@ -89,14 +88,13 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
       );
     }
 
-    /* 6️⃣ Views-over-time (optional, keep empty for now) */
-    const viewsOverTime = []; // can be added later if needed
+    const viewsOverTime = []; 
 
    
     res.json({
       success: true,
       data: {
-        // status: stats.first_viewed_at ? "viewed" : "pending",
+
         status: submission.status || "pending",
 
         totalViews: stats.total_views || 0,
