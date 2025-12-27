@@ -1,7 +1,24 @@
 import express from "express";
 import { supabase_connect } from "../supabase/set-up.js";
-
 const router = express.Router();
+async function getAuthUser(req) {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.replace("Bearer ", "")
+      : null;
+
+    if (!token) return null;
+
+    const { data, error } = await supabase_connect.auth.getUser(token);
+    if (error) return null;
+
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
 router.get("/:uniqueId", async (req, res) => {
   try {
     const { uniqueId } = req.params;
@@ -18,13 +35,29 @@ router.get("/:uniqueId", async (req, res) => {
     }
 
     /* ---------------- Update View Status ---------------- */
-    await supabase_connect
-      .from("design_submissions")
-      .update({
-        last_viewed_at: new Date().toISOString(),
-        status: "viewed",
-      })
-      .eq("id", design.id);
+    // await supabase_connect
+    //   .from("design_submissions")
+    //   .update({
+    //     last_viewed_at: new Date().toISOString(),
+    //     status: "viewed",
+    //   })
+    //   .eq("id", design.id);
+
+    const authUser = await getAuthUser(req);
+
+// viewer is owner (designer)
+const isOwner = authUser && authUser.id === design.user_id;
+
+if (!isOwner) {
+  await supabase_connect
+    .from("design_submissions")
+    .update({
+      last_viewed_at: new Date().toISOString(),
+      status: "viewed",
+    })
+    .eq("id", design.id);
+}
+
 
     /* ---------------- Fetch Layers (FIGMA) ---------------- */
     let layers = [];

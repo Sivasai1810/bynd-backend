@@ -187,11 +187,15 @@ router.post("", upload.array("pdf_files",30), async (req, res) => {
    
       const fileName = `${user_id}/${unique_id}/document.pdf`;
       const { data, error } = await supabase_connect.storage
-        .from("design_files")
-        .upload(fileName, mergedPdfBuffer, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
+  .from("design_files")
+  .upload(fileName, mergedPdfBuffer, {
+    contentType: "application/pdf",
+    upsert: true,
+    metadata: {
+      contentDisposition: "inline",
+    },
+  });
+
 
       if (error) {
         console.error("Supabase upload error:", error.message || error);

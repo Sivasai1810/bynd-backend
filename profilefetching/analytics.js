@@ -88,9 +88,27 @@ router.get("/:uniqueId/dashboard-analytics", async (req, res) => {
       );
     }
 
-    const viewsOverTime = []; 
+    const { data: dailyViews, error: dailyError } =
+  await supabase_connect
+    .from("submission_daily_views")
+    .select("view_date, views")
+    .eq("submission_id", submission.id)
+    .order("view_date", { ascending: true });
+
+  
+
+if (dailyError) {
+  console.error("[DASHBOARD] Daily views fetch error:", dailyError);
+}
+
+const viewsOverTime = (dailyViews || []).map(row => ({
+  date: row.view_date,
+  views: row.views,
+}));
+
 
    
+
     res.json({
       success: true,
       data: {

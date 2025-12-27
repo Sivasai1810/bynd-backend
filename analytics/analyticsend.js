@@ -1,8 +1,23 @@
 import express from "express";
 import { supabase_connect } from "../supabase/set-up.js";
-
 const router = express.Router();
+async function getAuthUser(req) {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.replace("Bearer ", "")
+      : null;
 
+    if (!token) return null;
+
+    const { data, error } = await supabase_connect.auth.getUser(token);
+    if (error) return null;
+
+    return data.user;
+  } catch {
+    return null;
+  }
+}
 function isSimilarDevice(a, b) {
   let score = 0;
 
@@ -27,18 +42,71 @@ router.post("/track", async (req, res) => {
     screen,
   } = req.body;
 
-  /*  Resolve submission */
+console.log("[TRACK] Incoming payload:", req.body);
+
   const { data: submission } = await supabase_connect
     .from("design_submissions")
-    .select("id")
+    .select("id , user_id")
     .eq("unique_id", submissionUniqueId)
     .single();
 
   if (!submission) {
     return res.status(404).json({ error: "Submission not found" });
   }
+     const authUser = await getAuthUser(req);
+const isOwner = !!(authUser && authUser.id === submission.user_id);
+if (isOwner) {
+  return res.json({ skipped: true, reason: "owner_view" });
+}
 
   const submissionId = submission.id;
+  console.log("[TRACK] Submission resolved:", {
+  submissionId: submission.id,
+  ownerId: submission.user_id,
+});
+
+
+  const today = new Date().toISOString().slice(0, 10);
+console.log("[DAILY] Updating daily views", {
+  submissionId,
+  today,
+});
+
+// 1️⃣ Try to fetch today's row
+const { data: existing } = await supabase_connect
+  .from("submission_daily_views")
+  .select("views")
+  .eq("submission_id", submissionId)
+  .eq("view_date", today)
+  .single();
+
+if (existing) {
+  // 2️⃣ Row exists → increment
+  await supabase_connect
+    .from("submission_daily_views")
+    .update({
+      views: existing.views + 1,
+    })
+    .eq("submission_id", submissionId)
+    .eq("view_date", today);
+
+  console.log("[DAILY] Incremented views to", existing.views + 1);
+} else {
+  // 3️⃣ First view of the day → insert
+  await supabase_connect
+    .from("submission_daily_views")
+    .insert({
+      submission_id: submissionId,
+      view_date: today,
+      views: 1,
+    });
+
+  console.log("[DAILY] Inserted first daily view");
+}
+
+
+
+
 
   const { data: stat } = await supabase_connect
     .from("submission_view_stats")
@@ -170,7 +238,7 @@ router.post("/time", async (req, res) => {
     const { submissionUniqueId, timeSpent } = body;
 
     console.log("[TIME] parsed:", { submissionUniqueId, timeSpent });
-
+     
     //  CORRECT validation (0 is allowed!)
     if (
       typeof submissionUniqueId !== "string" ||
@@ -189,7 +257,7 @@ router.post("/time", async (req, res) => {
     //  resolve submission
     const { data: submission } = await supabase_connect
       .from("design_submissions")
-      .select("id")
+      .select("id , user_id")
       .eq("unique_id", submissionUniqueId)
       .single();
 
@@ -197,6 +265,14 @@ router.post("/time", async (req, res) => {
       console.log("[TIME]  submission not found:", submissionUniqueId);
       return res.status(404).json({ ok: false });
     }
+  
+const authUser = await getAuthUser(req);
+const isOwner = !!(authUser && authUser.id === submission.user_id);
+
+
+if (isOwner) {
+  return res.json({ skipped: true, reason: "owner_view" });
+}
 
     const submissionId = submission.id;
     const now = new Date().toISOString();
