@@ -111,12 +111,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use('/fonts', express.static('fonts'));
 
-
-app.use('/storeurls', designdetials);
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use('/storeurls', designdetials);
 app.use('/auth/signup', signup);
 app.use('/auth/login', login);
 app.use('/supabase/redirecturl', redirecturl);

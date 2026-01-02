@@ -12,7 +12,7 @@ router.get("/", async (req, res) => {
       .from("notifications")
       .select("*")
       .eq("user_id", user_id)
-      .order("last_viewed_at", { ascending: false });  // newest first
+      .order("last_viewed_at", { ascending: false });  
 
     if (error) {
       return res.status(500).json({ error: error.message });

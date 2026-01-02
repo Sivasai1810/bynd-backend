@@ -82,22 +82,14 @@ async function getCleanupStats() {
     const activeSessions = data.filter(s => s.is_active).length;
     const inactiveSessions = totalSessions - activeSessions;
 
-    console.log("[Cleanup] Session Statistics:");
-    console.log(`  - Total sessions: ${totalSessions}`);
-    console.log(`  - Active sessions: ${activeSessions}`);
-    console.log(`  - Inactive sessions: ${inactiveSessions}`);
-    console.log(
-      `  - Active rate: ${totalSessions > 0 ? Math.round((activeSessions / totalSessions) * 100) : 0}%`
-    );
+  
   } catch (err) {
     console.error("[Cleanup] Error fetching stats:", err);
   }
 }
 
 export function initializeSessionCleanup() {
-  console.log("[Cleanup] Initializing session cleanup cron job...");
-  console.log(`[Cleanup] Schedule: ${CLEANUP_INTERVAL} (every 30 minutes)`);
-  console.log(`[Cleanup] Stale threshold: ${STALE_SESSION_THRESHOLD / 1000 / 60} minutes`);
+ 
 
   // Run cleanup immediately on startup
   cleanupStaleSessions().then(() => {
@@ -106,29 +98,21 @@ export function initializeSessionCleanup() {
 
   // Schedule cleanup to run every 30 minutes
   cron.schedule(CLEANUP_INTERVAL, async () => {
-    console.log("\n" + "=".repeat(60));
-    console.log(`[Cleanup] Running scheduled cleanup at ${new Date().toISOString()}`);
-    console.log("=".repeat(60));
+   
     
     await cleanupStaleSessions();
     await getCleanupStats();
   });
-
-  console.log("[Cleanup] ✓ Cron job initialized successfully\n");
 }
 
 
 export async function runManualCleanup() {
-  console.log("\n[Cleanup] Running manual cleanup...");
   await cleanupStaleSessions();
   await getCleanupStats();
-  console.log("[Cleanup] Manual cleanup complete\n");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log("Running manual cleanup...\n");
   runManualCleanup().then(() => {
-    console.log("\n✓ Cleanup completed. Exiting...");
     process.exit(0);
   });
 }

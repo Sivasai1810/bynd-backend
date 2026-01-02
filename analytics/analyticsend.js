@@ -72,7 +72,7 @@ console.log("[DAILY] Updating daily views", {
   today,
 });
 
-// 1️⃣ Try to fetch today's row
+
 const { data: existing } = await supabase_connect
   .from("submission_daily_views")
   .select("views")
@@ -81,7 +81,7 @@ const { data: existing } = await supabase_connect
   .single();
 
 if (existing) {
-  // 2️⃣ Row exists → increment
+ 
   await supabase_connect
     .from("submission_daily_views")
     .update({
@@ -92,7 +92,7 @@ if (existing) {
 
   console.log("[DAILY] Incremented views to", existing.views + 1);
 } else {
-  // 3️⃣ First view of the day → insert
+  
   await supabase_connect
     .from("submission_daily_views")
     .insert({

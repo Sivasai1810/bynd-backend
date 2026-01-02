@@ -1,3 +1,5 @@
+import dotenv from 'dotenv'
+dotenv.config()
 import express from "express";
 import { supabase_connect } from "../supabase/set-up.js";
 import multer from "multer";
@@ -27,19 +29,93 @@ const upload = multer({
     else cb(new Error("Only PDF, PNG, and JPEG files are allowed"));
   },
 });
-
-// helpers
-const extractFigmaFileKey = (url) => {
-  const match = url.match(/figma\.com\/(design|file)\/([a-zA-Z0-9]+)/);
-  return match ? match[2] : null;
-};
-const generateShareableLink = (uniqueId) =>
-  `http://bynd-final.vercel.app/recruiterview/${uniqueId}`;
 const getCleanFigmaToken = () => {
   const token = process.env.FIGMA_ACCESS_TOKEN;
+  
   if (!token) throw new Error("Missing FIGMA_ACCESS_TOKEN");
   return token.trim().replace(/[\r\n\t]/g, "");
 };
+// helpers
+const extractFigmaFileKey = (url) => {
+  const match = url.match(/figma\.com\/(file|design)\/([^/?]+)/);
+  return match ? match[2] : null;
+};
+
+// ===== FIGMA HELPERS =====
+async function fetchFigmaFile(fileKey) {
+  const token = getCleanFigmaToken();
+
+  try {
+    const response = await axios.get(
+      `https://api.figma.com/v1/files/${fileKey}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+
+  } catch (err) {
+    console.error("FIGMA API ERROR:", err.response?.data || err.message);
+    throw new Error("Figma API request failed");
+  }
+}
+
+async function fetchFigmaImages(fileKey, ids) {
+  const token = getCleanFigmaToken();
+
+  try {
+    const res = await axios.get(
+      `https://api.figma.com/v1/images/${fileKey}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          ids: ids.join(","),
+          format: "png",
+          scale: 2,
+        },
+      }
+    );
+
+    return res.data.images;
+
+  } catch (err) {
+    console.error("FIGMA IMAGE ERROR:", err.response?.data || err.message);
+    throw new Error("Figma image fetch failed");
+  }
+}
+
+function extractFigmaFrames(figmaFile) {
+  const frames = [];
+
+  function walk(node) {
+    if (node.type === "FRAME") {
+      frames.push({
+        id: node.id,
+        name: node.name,
+      });
+    }
+
+    if (node.children) {
+      node.children.forEach(walk);
+    }
+  }
+
+  figmaFile.document.children.forEach(page => {
+    page.children?.forEach(walk);
+  });
+
+  return frames;
+}
+
+
+const generateShareableLink = (uniqueId) =>
+  `http://bynd-final.vercel.app/recruiterview/${uniqueId}`;
+
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 
@@ -144,8 +220,15 @@ async function generatePdfPreview(pdfPath, userId, submissionId) {
   }
 }
 
-// route: accepts multiple files as "pdf_files"
-router.post("", upload.array("pdf_files",30), async (req, res) => {
+router.post("", (req, res, next) => {
+  // If content-type is multipart → use multer
+  if (req.headers["content-type"]?.includes("multipart/form-data")) {
+    return upload.array("pdf_files", 30)(req, res, next);
+  }
+  // else → JSON (figma)
+  next();
+}, async (req, res) => {
+
   try {
     const {
       user_id,
@@ -247,12 +330,45 @@ router.post("", upload.array("pdf_files",30), async (req, res) => {
     }
 
     // If figma flow, keep original figma handling if needed (layers etc.)
-    if (normalizedType === "figma" && original_url) {
-      // keep your figma handling code (fetch layers, store layer images etc.)
-      // You can call your existing helpers here:
-      // const layers = await fetchFigmaLayers(original_url);
-      // if (layers.length > 0) { ... storeFigmaLayersWithImages(...) ... }
-    }
+   if (normalizedType === "figma" && original_url) {
+  const fileKey = extractFigmaFileKey(original_url);
+  if (!fileKey) {
+    return res.status(400).json({ error: "Invalid Figma URL" });
+  }
+
+
+  const figmaFile = await fetchFigmaFile(fileKey);
+
+  
+  const frames = extractFigmaFrames(figmaFile);
+  if (!frames.length) return;
+
+  
+  const imageMap = await fetchFigmaImages(
+    fileKey,
+    frames.map(f => f.id)
+  );
+
+
+  let order = 0;
+
+  for (const frame of frames) {
+    const previewUrl = imageMap[frame.id];
+    if (!previewUrl) continue;
+
+    await supabase_connect
+      .from("design_layers")
+      .insert({
+        submission_id: submission.id,
+        user_id,
+        layer_name: frame.name,
+        layer_order: order++,
+        layer_preview_url: previewUrl,
+        layer_embed_url: null, // optional for future
+      });
+  }
+}
+
 
     return res.status(201).json({
       success: true,
