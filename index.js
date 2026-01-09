@@ -17,7 +17,7 @@ import DashboardAnalytics from "./profilefetching/analytics.js";
 import EmployersviewRoute from "./previewsection/employersview.js";
 import DesignPreview from "./previewsection/designpreview.js";
 import AnalyticsRoutes from "./analytics/analyticsend.js";
-import Setnotifications from "./notification/setnotification.js"
+// import Setnotifications from "./notification/setnotification.js"
 import Sentnotification from "./notification/sentnotification.js"
 const app = express();
 
@@ -61,7 +61,7 @@ app.use('/getanalytics', DashboardAnalytics);
 app.use("/api/preview", EmployersviewRoute);
 app.use("/api/view", DesignPreview);
 app.use("/api/analytics", AnalyticsRoutes);
-app.use("/sendnotification",Setnotifications)
+// app.use("/sendnotification",Setnotifications)
 app.use("/fetchnotification",Sentnotification)
 const port = process.env.PORT || 3000;
 app.listen(port, () => {

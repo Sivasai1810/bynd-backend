@@ -152,7 +152,6 @@ async function mergeFilesToSinglePdfBuffer(files) {
       
         const preparedBuffer = await prepareImageForPdf(file.buffer, 1500);
 
-       
         let embeddedImage;
       
         embeddedImage = await mergedPdf.embedPng(preparedBuffer);
