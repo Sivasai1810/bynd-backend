@@ -114,7 +114,7 @@ function extractFigmaFrames(figmaFile) {
 
 
 const generateShareableLink = (uniqueId) =>
-  `http://bynd-final.vercel.app/recruiterview/${uniqueId}`;
+  `https://bynd-final.vercel.app/recruiterview/${uniqueId}`;
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 

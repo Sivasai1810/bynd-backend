@@ -220,37 +220,45 @@ await supabase_connect
   return res.json({ unique: isUnique });
 });
 router.post("/time", async (req, res) => {
+ 
+
+try{
+
+  let body = req.body;
+
+// handle sendBeacon / text payload
+if (typeof body === "string") {
   try {
-    console.log("[TIME] raw body:", req.body);
+    body = JSON.parse(body);
+  } catch (err) {
+    console.log("invalid body:", body);
+    return res.json({ ok: false });
+  }
+}
 
-    let body = req.body;
+// handle totally missing body
+if (!body || typeof body !== "object") {
+ 
+  return res.json({ ok: false });
+}
 
-    //handle sendBeacon/text or fetch/json
-    if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch {
-        console.log("[TIME]  invalid JSON");
-        return res.json({ ok: false });
-      }
-    }
+const { submissionUniqueId, timeSpent,isOwnerView } = body;
 
-    const { submissionUniqueId, timeSpent } = body;
-
-    console.log("[TIME] parsed:", { submissionUniqueId, timeSpent });
-     
-    //  CORRECT validation (0 is allowed!)
+  if (isOwnerView === true) {
+  console.log("[TIME] skipped owner view");
+  return res.json({ skipped: true });
+}
+ 
     if (
       typeof submissionUniqueId !== "string" ||
       typeof timeSpent !== "number"
     ) {
-      console.log("[TIME]  invalid payload", body);
+     
       return res.json({ ok: false });
     }
 
     // only block impossible values
     if (timeSpent < 0 || timeSpent > 6 * 60 * 60) {
-      console.log("[TIME] ⏭ ignored unrealistic timeSpent:", timeSpent);
       return res.json({ ok: true, ignored: true });
     }
 
@@ -283,6 +291,15 @@ if (isOwner) {
       .select("*")
       .eq("submission_id", submissionId)
       .single();
+if (stat?.updated_at) {
+  const last = new Date(stat.updated_at).getTime();
+  const nowMs = Date.now();
+
+  if (nowMs - last < 10_000) {
+    console.log("[TIME] skipped duplicate session");
+    return res.json({ ok: true, skipped: true });
+  }
+}
 
     //  first time entry
     if (!stat) {
@@ -310,7 +327,7 @@ if (isOwner) {
       .update({
         total_time_spent: total,
         sessions_count: sessions,
-        avg_time_spent: Math.round(total / sessions),
+      avg_time_spent: Math.floor(total / sessions),
         last_viewed_at: now,
         updated_at: now,
       })

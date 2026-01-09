@@ -1,28 +1,15 @@
 import dotenv from 'dotenv'
 dotenv.config()
 import express from "express";
-import nodemailer from "nodemailer";
+import { Resend } from "resend"
 import { supabase_connect } from "../supabase/set-up.js";
-
 const router = express.Router();
+const resend = new Resend(process.env.RESEND_TOKEN)
 
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 router.post("/:uniqueId", async (req, res) => {
-
-
-
+  console.log("Incoming request successfully")
   try {
     const { uniqueId } = req.params;
-  
-
-    
     const { data: existingNotification } =
       await supabase_connect
         .from("notifications")
@@ -75,11 +62,40 @@ router.post("/:uniqueId", async (req, res) => {
 
     const designerEmail = authUser.user.email;
    
-    const mailRes = await transporter.sendMail({
-      from: `"BYND" <${process.env.EMAIL_USER}>`,
-      to: designerEmail,
-      subject: `${submission.company_name} viewed your assignment`,
-      html: `
+    // const mailRes = await transporter.sendMail({
+    //   from: `"BYND" <${process.env.EMAIL_USER}>`,
+    //   to: designerEmail,
+    //   subject: `${submission.company_name} viewed your assignment`,
+    //   html: `
+    //     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto;">
+    //       <p>
+    //         Your assignment has been viewed by
+    //         <strong>${submission.company_name}</strong>
+    //         for the position of
+    //         <strong>${submission.position}</strong>.
+    //       </p>
+
+    //       <p style="color:#374151;">
+    //         You can check detailed analytics such as views and engagement from your dashboard.
+    //       </p>
+
+    //       <p style="font-size:12px;color:#6b7280;">
+    //         ${new Date().toLocaleString("en-IN")}
+    //       </p>
+
+    //       <p>
+    //         Best regards,<br/>
+    //         <strong>BYND Team</strong>
+    //       </p>
+    //     </div>
+    //   `
+    // });
+const { data, error } =await resend.emails.send({
+// from:`"BYND" <${process.env.EMAIL_USER}>`,
+from: "BYND <onboarding@resend.dev>",
+to:designerEmail,
+subject:`${submission.company_name} viewed your assignment`,
+ html: `
         <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto;">
           <p>
             Your assignment has been viewed by
@@ -100,11 +116,13 @@ router.post("/:uniqueId", async (req, res) => {
             Best regards,<br/>
             <strong>BYND Team</strong>
           </p>
-        </div>
-      `
-    });
-
-    console.log(" Email sent:", mailRes.messageId);
+        </div>`
+ })
+    if(error){
+      console.log("Email failed :",error)
+    }else{
+      console.log("Email sent successfully",data.id)
+    }
 
     return res.status(200).json({
       success: true,
