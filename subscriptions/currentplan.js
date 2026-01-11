@@ -17,7 +17,6 @@ const CACHE_TTL = 60 * 1000; // 1 minute
 router.get("/", async (req, res) => {
   try {
     const { user_id } = req.query;
-
     if (!user_id) {
       return res.status(400).json({ error: "user_id required" });
     }
@@ -68,8 +67,10 @@ router.get("/", async (req, res) => {
 
 router.post("/start-trial", async (req, res) => {
   try {
-    const { user_id } = req.body;
-
+   const { user_id } = req.body;
+   console.log(req.body)
+console.log("fdvdfvfdvdds")
+console.log(user_id)
     if (!user_id) {
       return res.status(400).json({ error: "user_id required" });
     }

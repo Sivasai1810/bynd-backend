@@ -31,7 +31,9 @@ function isSimilarDevice(a, b) {
 }
 
 /* TRACK VIEW ROUTE (UNCHANGED) */
-router.post("/track", async (req, res) => {
+router.post("/track", 
+   express.json(),
+   async (req, res) => {
   const {
     submissionUniqueId,
     browserID,
@@ -219,127 +221,105 @@ await supabase_connect
 
   return res.json({ unique: isUnique });
 });
-router.post("/time", async (req, res) => {
- 
+router.post(
+  "/time",
+  express.text({ type: "text/plain", limit: "10kb" }),
+  async (req, res) => {
+    try {
+      let body = req.body;
 
-try{
+      if (typeof body === "string") {
+        try {
+          body = JSON.parse(body);
+        } catch {
+          return res.json({ ok: false });
+        }
+      }
 
-  let body = req.body;
+      if (!body || typeof body !== "object") {
+        return res.json({ ok: false });
+      }
 
-// handle sendBeacon / text payload
-if (typeof body === "string") {
-  try {
-    body = JSON.parse(body);
-  } catch (err) {
-    console.log("invalid body:", body);
-    return res.json({ ok: false });
-  }
-}
+      const { submissionUniqueId, timeSpent, isOwnerView } = body;
 
-// handle totally missing body
-if (!body || typeof body !== "object") {
- 
-  return res.json({ ok: false });
-}
+      console.log("[TIME] payload:", body);
 
-const { submissionUniqueId, timeSpent,isOwnerView } = body;
+      if (isOwnerView === true) {
+        return res.json({ skipped: true });
+      }
 
-  if (isOwnerView === true) {
-  console.log("[TIME] skipped owner view");
-  return res.json({ skipped: true });
-}
- 
-    if (
-      typeof submissionUniqueId !== "string" ||
-      typeof timeSpent !== "number"
-    ) {
-     
-      return res.json({ ok: false });
-    }
+      if (
+        typeof submissionUniqueId !== "string" ||
+        typeof timeSpent !== "number"
+      ) {
+        return res.json({ ok: false });
+      }
 
-    // only block impossible values
-    if (timeSpent < 0 || timeSpent > 6 * 60 * 60) {
-      return res.json({ ok: true, ignored: true });
-    }
+      if (timeSpent < 3 || timeSpent > 6 * 60 * 60) {
+        return res.json({ ignored: true });
+      }
 
-    //  resolve submission
-    const { data: submission } = await supabase_connect
-      .from("design_submissions")
-      .select("id , user_id")
-      .eq("unique_id", submissionUniqueId)
-      .single();
+      const { data: submission } = await supabase_connect
+        .from("design_submissions")
+        .select("id")
+        .eq("unique_id", submissionUniqueId)
+        .single();
 
-    if (!submission) {
-      console.log("[TIME]  submission not found:", submissionUniqueId);
-      return res.status(404).json({ ok: false });
-    }
-  
-const authUser = await getAuthUser(req);
-const isOwner = !!(authUser && authUser.id === submission.user_id);
+      if (!submission) {
+        return res.json({ ok: false });
+      }
 
+      const submissionId = submission.id;
+      const now = new Date().toISOString();
 
-if (isOwner) {
-  return res.json({ skipped: true, reason: "owner_view" });
-}
+      const { data: stat } = await supabase_connect
+        .from("submission_view_stats")
+        .select("*")
+        .eq("submission_id", submissionId)
+        .single();
 
-    const submissionId = submission.id;
-    const now = new Date().toISOString();
+      if (stat?.last_viewed_at) {
+        const last = new Date(stat.last_viewed_at).getTime();
+        if (Date.now() - last < 3000) {
+          return res.json({ skipped: true });
+        }
+      }
 
-    //  fetch stats
-    const { data: stat } = await supabase_connect
-      .from("submission_view_stats")
-      .select("*")
-      .eq("submission_id", submissionId)
-      .single();
-if (stat?.updated_at) {
-  const last = new Date(stat.updated_at).getTime();
-  const nowMs = Date.now();
+      if (!stat) {
+        await supabase_connect
+          .from("submission_view_stats")
+          .insert({
+            submission_id: submissionId,
+            total_time_spent: timeSpent,
+            sessions_count: 1,
+            avg_time_spent: timeSpent,
+            first_viewed_at: now,
+            last_viewed_at: now,
+          });
 
-  if (nowMs - last < 10_000) {
-    console.log("[TIME] skipped duplicate session");
-    return res.json({ ok: true, skipped: true });
-  }
-}
+        return res.json({ created: true });
+      }
 
-    //  first time entry
-    if (!stat) {
+      const total = (stat.total_time_spent || 0) + timeSpent;
+      const sessions = (stat.sessions_count || 0) + 1;
+
       await supabase_connect
         .from("submission_view_stats")
-        .insert({
-          submission_id: submissionId,
-          total_time_spent: timeSpent,
-          sessions_count: 1,
-          avg_time_spent: timeSpent,
-          first_viewed_at: now,
+        .update({
+          total_time_spent: total,
+          sessions_count: sessions,
+          avg_time_spent: Math.floor(total / sessions),
           last_viewed_at: now,
-        });
+        })
+        .eq("submission_id", submissionId);
 
-      console.log("[TIME]  stats created");
-      return res.json({ ok: true, created: true });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("[TIME ERROR]", err);
+      res.status(500).json({ ok: false });
     }
-
-    //update existing
-    const total = (stat.total_time_spent || 0) + timeSpent;
-    const sessions = (stat.sessions_count || 0) + 1;
-
-    await supabase_connect
-      .from("submission_view_stats")
-      .update({
-        total_time_spent: total,
-        sessions_count: sessions,
-      avg_time_spent: Math.floor(total / sessions),
-        last_viewed_at: now,
-        updated_at: now,
-      })
-      .eq("submission_id", submissionId);
-
-    console.log("[TIME] stats updated");
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("[ANALYTICS TIME ERROR]", err);
-    res.status(500).json({ ok: false });
   }
-});
+);
+
 
 export default router;

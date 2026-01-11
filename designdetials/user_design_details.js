@@ -219,14 +219,11 @@ async function generatePdfPreview(pdfPath, userId, submissionId) {
   }
 }
 
-router.post("", (req, res, next) => {
-  // If content-type is multipart → use multer
-  if (req.headers["content-type"]?.includes("multipart/form-data")) {
-    return upload.array("pdf_files", 30)(req, res, next);
-  }
-  // else → JSON (figma)
-  next();
-}, async (req, res) => {
+router.post(
+  "",
+  upload.array("pdf_files", 30),
+  async (req, res) => {
+
 
   try {
     const {
